@@ -15,17 +15,17 @@
 <style>
   :root{
     --sat:env(safe-area-inset-top,0px);
-    --mapf:grayscale(1) sepia(1) saturate(6) hue-rotate(-42deg) brightness(.95) contrast(1.15);
+    --mapf:invert(1) grayscale(1) brightness(.75) contrast(1.35) sepia(1) saturate(7) hue-rotate(-42deg);
     --c:#ff2a1a; --c2:rgba(255,42,26,.55); --c3:rgba(255,42,26,.22); --c4:rgba(255,42,26,.08);
     --bg:#000; --glow:0 0 6px rgba(255,42,26,.65);
   }
   body[data-theme="nvg"]  { --c:#39ff6a; --c2:rgba(57,255,106,.55); --c3:rgba(57,255,106,.22); --c4:rgba(57,255,106,.08); --glow:0 0 6px rgba(57,255,106,.6); }
   body[data-theme="amber"]{ --c:#ffb000; --c2:rgba(255,176,0,.55); --c3:rgba(255,176,0,.22); --c4:rgba(255,176,0,.08); --glow:0 0 6px rgba(255,176,0,.6); }
   body[data-theme="day"]  { --c:#e8f1ff; --c2:rgba(232,241,255,.6); --c3:rgba(232,241,255,.22); --c4:rgba(232,241,255,.07); --glow:0 0 5px rgba(160,200,255,.5); }
-  body[data-theme="nvg"]  { --mapf:grayscale(1) sepia(1) saturate(5) hue-rotate(72deg) brightness(.95) contrast(1.1); }
-  body[data-theme="amber"]{ --mapf:grayscale(1) sepia(1) saturate(4) hue-rotate(-5deg) brightness(.95) contrast(1.1); }
-  body[data-theme="day"]  { --mapf:none; }
-  body[data-theme="dim"]  { --mapf:grayscale(1) sepia(1) saturate(6) hue-rotate(-42deg) brightness(.45) contrast(1.2); }
+  body[data-theme="nvg"]  { --mapf:invert(1) grayscale(1) brightness(.75) contrast(1.35) sepia(1) saturate(6) hue-rotate(72deg); }
+  body[data-theme="amber"]{ --mapf:invert(1) grayscale(1) brightness(.75) contrast(1.35) sepia(1) saturate(5) hue-rotate(-5deg); }
+  body[data-theme="day"]  { --mapf:invert(1) hue-rotate(180deg) brightness(.9) contrast(1.1); }
+  body[data-theme="dim"]  { --mapf:invert(1) grayscale(1) brightness(.4) contrast(1.4) sepia(1) saturate(7) hue-rotate(-42deg); }
   body[data-theme="dim"]  { --c:#8a0c04; --c2:rgba(138,12,4,.7); --c3:rgba(138,12,4,.35); --c4:rgba(138,12,4,.12); --glow:none; }
 
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -301,7 +301,7 @@
     <button id="nvMute" title="Voice">VOX</button>
     <button id="nvAll" title="Overview">ALL</button>
   </div>
-  <div class="nvAttr">© OPENSTREETMAP © CARTO · ROUTING FOSSGIS/OSRM</div>
+  <div class="nvAttr">© OPENSTREETMAP CONTRIBUTORS · ROUTING FOSSGIS/OSRM</div>
   <div class="nvBot">
     <div class="nvStats">
       <div><b id="nvEta">--:--</b><span>ARRIVE</span></div>
@@ -746,7 +746,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
     function ensureMap(){
       if(map) return;
       map=L.map('map',{zoomControl:false,attributionControl:false,zoomSnap:.25,inertia:false});
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:20}).addTo(map);
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,crossOrigin:true}).addTo(map);
       map.on('dragstart zoomstart',e=>{ if(e.originalEvent||e.type==='dragstart'){ follow=false; $('nvCenter').classList.remove('on'); } });
     }
 
@@ -841,7 +841,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       $('mapRot').style.transform=hdgUp?`rotate(${rot}deg)`:'none';
       $('me').style.transform=hdgUp?'none':`rotate(${h}deg)`;
     }
-    function zoomFor(){ if(mode==='walk') return 18; const k=(pos&&pos.spd||0)*3.6; return k>90?15.25:k>55?16:k>25?16.75:17.25; }
+    function zoomFor(){ if(mode==='walk') return 18.5; const k=(pos&&pos.spd||0)*3.6; return k>90?15.25:k>55?16:k>25?16.75:17.25; }
 
     function update(force){
       if(!active||!pos) return;
