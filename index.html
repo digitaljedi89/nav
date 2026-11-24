@@ -21,6 +21,8 @@
   body[data-theme="dim"]  { --c:#8a0c04; --c2:rgba(138,12,4,.7); --c3:rgba(138,12,4,.35); --c4:rgba(138,12,4,.12); --glow:none; }
 
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body,button,input{touch-action:manipulation}
+  .keys button.hit{background:var(--c);color:var(--bg)}
   html,body{background:var(--bg);color:var(--c);height:100%}
   body{
     font-family:'Share Tech Mono',ui-monospace,monospace;font-size:13px;letter-spacing:.06em;
@@ -156,6 +158,7 @@
     <div class="authmsg h" id="authMsg"></div>
     <canvas id="wave" width="600" height="110"></canvas>
     <div class="heard" id="heard">&nbsp;</div>
+    <input id="phraseIn" hidden autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="TAP 🎤 ON KEYBOARD TO DICTATE" style="margin-bottom:10px;text-align:center">
     <div class="pinpad" id="pinPad" hidden>
       <div class="pindots" id="pinDots"></div>
       <div class="keys" id="keys"></div>
@@ -748,9 +751,9 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
   let authState=null, fails=0, tmpPhrase='', tmpPin='', pinBuf='', listening=false, level=0;
 
   const lines=['> NAVCOM v1.1 // NTS32-OPS','> LOADING GRID REF ..... WGS84','> MGRS MODULE .......... OK',
-    '> VOICE MODULE ......... '+(SR?'OK':'OFFLINE'),'> SAFE HOUSE DB ........ '+String(houses.length).padStart(2,'0')+' SITES',
+    '> VOICE MODULE ......... '+(SR?'OK':'DICTATION MODE'),'> SAFE HOUSE DB ........ '+String(houses.length).padStart(2,'0')+' SITES',
     creds?'> AWAITING OPERATOR AUTH_':'> NO OPERATOR ON FILE_'];
-  let li=0; (function type(){ if(li<lines.length){ $('bootlog').textContent+=lines[li++]+'\n'; setTimeout(type,170);} else { $('authPanel').style.visibility='visible'; setState(creds?'auth':(SR?'enroll1':'pinset')); } })();
+  let li=0; (function type(){ if(li<lines.length){ $('bootlog').textContent+=lines[li++]+'\n'; setTimeout(type,170);} else { $('authPanel').style.visibility='visible'; setState(creds?'auth':'enroll1'); } })();
 
   const norm=s=>String(s).toLowerCase().replace(/[^a-z0-9]/g,'');
   function sim(a,b){
@@ -792,15 +795,20 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
   function showPad(on){ $('pinPad').hidden=!on; pinBuf=''; drawDots(); }
   function drawDots(){ $('pinDots').innerHTML=Array.from({length:6},(_,i)=>`<i class="${i<pinBuf.length?'f':''}"></i>`).join(''); }
   $('keys').innerHTML=['1','2','3','4','5','6','7','8','9','CLR','0','OK'].map(k=>`<button data-k="${k}" ${k.length>1?'style="font-size:11px"':''}>${k}</button>`).join('');
-  $('keys').onclick=e=>{
-    const k=e.target.closest('button')?.dataset.k; if(!k) return;
+  $('keys').addEventListener('pointerdown',e=>{
+    const b=e.target.closest('button'), k=b?.dataset.k; if(!k) return;
+    e.preventDefault();
+    b.classList.add('hit'); setTimeout(()=>b.classList.remove('hit'),110);
+    if(navigator.vibrate) navigator.vibrate(8);
     if(k==='CLR') pinBuf=''; else if(k==='OK') { pinSubmit(); return; } else if(pinBuf.length<6) pinBuf+=k;
     drawDots();
-  };
+  });
 
   async function voiceStep(){
     if(listening) return;
-    const alts=await listen();
+    let alts;
+    if(SR) alts=await listen();
+    else { const v=$('phraseIn').value.trim(); $('phraseIn').value=''; $('phraseIn').blur(); alts=v?[v]:[]; if(v) $('heard').textContent='“'+v+'”'; }
     if(!alts.length){ $('heard').innerHTML='&nbsp;'; msg('NO SIGNAL — TRY AGAIN',true); return; }
     if(authState==='enroll1'){
       if(norm(alts[0]).length<8){ msg('PASSPHRASE TOO SHORT — USE 3+ WORDS',true); return; }
@@ -830,20 +838,22 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
   function setState(s,note,viaPin){
     authState=s; $('heard').innerHTML='&nbsp;'; showPad(['pinset','pinconfirm','pin'].includes(s));
-    const speak=['● Speak passphrase',voiceStep,'solid'];
+    const dict=!SR && ['enroll1','enroll2','auth'].includes(s) && !(s==='auth'&&!creds.phrase);
+    $('phraseIn').hidden=!dict; $('phraseIn').value='';
+    const speak=[SR?'● Speak passphrase':'▶ Submit passphrase',voiceStep,'solid'];
     switch(s){
       case 'enroll1': msg('ENROLL OPERATOR // STATE A PASSPHRASE (3+ WORDS)'); btns([speak,['Skip — PIN only',()=>{ tmpPhrase=''; setState('pinset'); },'small']]); break;
       case 'enroll2': msg('CONFIRM // REPEAT PASSPHRASE'); btns([speak,['Restart',()=>setState('enroll1'),'small']]); break;
-      case 'pinset': msg((SR?'':'VOICE MODULE OFFLINE // ')+'SET OVERRIDE PIN (4–6 DIGITS)'); btns([]); break;
+      case 'pinset': msg('SET OVERRIDE PIN (4–6 DIGITS)'); btns([]); break;
       case 'pinconfirm': msg('CONFIRM OVERRIDE PIN'); btns([]); break;
       case 'auth': fails=0; msg('VOICE AUTHENTICATION REQUIRED');
-        btns(SR&&creds.phrase?[speak,['PIN override',()=>setState('pin'),'small']]:[['Enter PIN',()=>setState('pin'),'solid']]); break;
-      case 'pin': msg('ENTER OVERRIDE CODE'); btns(SR&&creds.phrase?[['Back to voice',()=>setState('auth'),'small']]:[]); break;
+        btns(creds.phrase?[speak,['PIN override',()=>setState('pin'),'small']]:[['Enter PIN',()=>setState('pin'),'solid']]); break;
+      case 'pin': msg('ENTER OVERRIDE CODE'); btns(creds.phrase?[['Back to voice',()=>setState('auth'),'small']]:[]); break;
       case 'granted':
         msg((note?note+' // ':'')+'ACCESS GRANTED');
         $('bootlog').textContent+='> OPERATOR VERIFIED // WELCOME_\n';
         const list=[[booted?'Resume':'Initialize',enter,'solid']];
-        if(viaPin && SR) list.push(['Re-enroll voice passphrase',()=>{ tmpPhrase=''; setState('enroll1'); },'small']);
+        if(viaPin) list.push(['Re-enroll voice passphrase',()=>{ tmpPhrase=''; setState('enroll1'); },'small']);
         btns(list); break;
     }
   }
