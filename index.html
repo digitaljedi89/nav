@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="NAVCOM">
+<meta name="theme-color" content="#000000">
+<title>NAVCOM // NTS32-OPS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --c:#ff2a1a; --c2:rgba(255,42,26,.55); --c3:rgba(255,42,26,.22); --c4:rgba(255,42,26,.08);
+    --bg:#000; --glow:0 0 6px rgba(255,42,26,.65);
+  }
+  body[data-theme="nvg"]  { --c:#39ff6a; --c2:rgba(57,255,106,.55); --c3:rgba(57,255,106,.22); --c4:rgba(57,255,106,.08); --glow:0 0 6px rgba(57,255,106,.6); }
+  body[data-theme="amber"]{ --c:#ffb000; --c2:rgba(255,176,0,.55); --c3:rgba(255,176,0,.22); --c4:rgba(255,176,0,.08); --glow:0 0 6px rgba(255,176,0,.6); }
+  body[data-theme="day"]  { --c:#e8f1ff; --c2:rgba(232,241,255,.6); --c3:rgba(232,241,255,.22); --c4:rgba(232,241,255,.07); --glow:0 0 5px rgba(160,200,255,.5); }
+  body[data-theme="dim"]  { --c:#8a0c04; --c2:rgba(138,12,4,.7); --c3:rgba(138,12,4,.35); --c4:rgba(138,12,4,.12); --glow:none; }
+
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{background:var(--bg);color:var(--c);height:100%}
+  body{
+    font-family:'Share Tech Mono',ui-monospace,monospace;font-size:13px;letter-spacing:.06em;
+    padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+    overflow-x:hidden;user-select:none;-webkit-user-select:none;
+  }
+  /* CRT scanlines + vignette */
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;
+    background:repeating-linear-gradient(0deg,rgba(0,0,0,.28) 0 1px,transparent 1px 3px);}
+  body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:51;
+    background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.7) 100%);}
+  .h{font-family:'Orbitron',sans-serif;text-transform:uppercase}
+  .glow{text-shadow:var(--glow)}
+  .wrap{max-width:480px;margin:0 auto;padding:10px 12px 40px}
+
+  /* header */
+  header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1px solid var(--c3);padding-bottom:8px}
+  .brand{font-size:20px;font-weight:900;letter-spacing:.18em}
+  .brand small{display:block;font-family:'Share Tech Mono';font-weight:400;font-size:10px;letter-spacing:.3em;color:var(--c2)}
+  .clock{text-align:right;font-size:11px;color:var(--c2);line-height:1.4}
+  .clock b{font-family:'Orbitron';font-weight:600;color:var(--c);font-size:14px;letter-spacing:.1em}
+
+  .status{display:flex;gap:6px;margin:8px 0;flex-wrap:wrap}
+  .pill{border:1px solid var(--c3);padding:3px 7px;font-size:10px;letter-spacing:.2em;color:var(--c2)}
+  .pill.on{color:var(--c);border-color:var(--c2);text-shadow:var(--glow)}
+  .pill .dot{display:inline-block;width:6px;height:6px;background:currentColor;margin-right:5px;vertical-align:1px}
+  .pill.on .dot{animation:blink 1.2s steps(2) infinite}
+  @keyframes blink{50%{opacity:.15}}
+
+  /* frames */
+  .frame{position:relative;border:1px solid var(--c3);padding:10px;margin-top:10px;background:var(--c4)}
+  .frame::before,.frame::after{content:"";position:absolute;width:10px;height:10px;border:2px solid var(--c)}
+  .frame::before{top:-2px;left:-2px;border-right:0;border-bottom:0}
+  .frame::after{bottom:-2px;right:-2px;border-left:0;border-top:0}
+  .tag{position:absolute;top:-8px;left:14px;background:var(--bg);padding:0 6px;font-size:10px;letter-spacing:.3em;color:var(--c2)}
+
+  /* compass */
+  .compass{position:relative;width:100%;aspect-ratio:1;max-width:340px;margin:6px auto 0}
+  .compass svg{width:100%;height:100%;overflow:visible}
+  .hdgbox{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none}
+  .hdgbox .v{font-family:'Orbitron';font-weight:800;font-size:44px;letter-spacing:.04em;text-shadow:var(--glow)}
+  .hdgbox .l{font-size:10px;letter-spacing:.35em;color:var(--c2)}
+  .hdgbox .card{font-family:'Orbitron';font-size:14px;font-weight:600;letter-spacing:.3em}
+
+  /* readouts */
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+  .cell{border-left:2px solid var(--c2);padding:4px 8px}
+  .cell .l{font-size:10px;letter-spacing:.3em;color:var(--c2)}
+  .cell .v{font-family:'Orbitron';font-weight:600;font-size:20px;text-shadow:var(--glow);white-space:nowrap}
+  .cell .v small{font-family:'Share Tech Mono';font-size:11px;color:var(--c2);margin-left:3px}
+  .coord{grid-column:1/-1;cursor:pointer}
+  .coord .v{font-size:18px;line-height:1.35;white-space:normal}
+  .accbar{height:4px;background:var(--c3);margin-top:5px;position:relative}
+  .accbar i{position:absolute;inset:0 auto 0 0;background:var(--c);box-shadow:var(--glow);transition:width .4s}
+
+  /* target */
+  .target{display:none;align-items:center;gap:12px}
+  .target.show{display:flex}
+  .tarrow{width:74px;height:74px;flex:none;transition:transform .25s ease-out}
+  .target .name{font-family:'Orbitron';font-weight:800;font-size:18px;letter-spacing:.12em}
+  .target .dist{font-family:'Orbitron';font-weight:600;font-size:28px;text-shadow:var(--glow)}
+  .target .meta{font-size:11px;color:var(--c2);letter-spacing:.15em}
+
+  /* safe houses */
+  .shhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .shhead .h{font-size:13px;font-weight:600;letter-spacing:.25em}
+  .sh{display:flex;align-items:center;gap:10px;padding:9px 4px;border-top:1px dashed var(--c3);cursor:pointer}
+  .sh:first-of-type{border-top:0}
+  .sh.sel{background:var(--c3)}
+  .sh .idx{font-family:'Orbitron';font-size:10px;color:var(--c2);width:22px}
+  .sh .nm{flex:1;min-width:0}
+  .sh .nm b{display:block;font-family:'Orbitron';font-weight:600;font-size:14px;letter-spacing:.1em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sh .nm span{font-size:10px;color:var(--c2)}
+  .sh .d{text-align:right;font-family:'Orbitron';font-size:14px;font-weight:600}
+  .sh .d span{display:block;font-family:'Share Tech Mono';font-size:10px;color:var(--c2);font-weight:400}
+  .sh svg{width:26px;height:26px;flex:none;transition:transform .25s ease-out}
+  .sh .x{width:26px;height:26px;border:1px solid var(--c3);display:grid;place-items:center;color:var(--c2);font-size:13px;flex:none}
+  .empty{color:var(--c2);font-size:11px;padding:10px 4px;letter-spacing:.15em}
+
+  button,.btn{font-family:'Orbitron';font-weight:600;font-size:11px;letter-spacing:.2em;text-transform:uppercase;
+    background:transparent;color:var(--c);border:1px solid var(--c2);padding:8px 12px;cursor:pointer}
+  button:active{background:var(--c3)}
+  button.solid{background:var(--c);color:var(--bg);border-color:var(--c)}
+
+  .toolbar{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
+  .toolbar button{flex:1;padding:9px 4px;font-size:9px}
+
+  /* modal */
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:flex-end;justify-content:center;z-index:40}
+  .modal.show{display:flex}
+  .sheet{width:100%;max-width:480px;background:var(--bg);border-top:1px solid var(--c2);padding:18px 16px calc(18px + env(safe-area-inset-bottom))}
+  .sheet .h{font-size:14px;font-weight:800;letter-spacing:.25em;margin-bottom:12px}
+  label{display:block;font-size:10px;letter-spacing:.3em;color:var(--c2);margin:10px 0 4px}
+  input{width:100%;background:transparent;border:1px solid var(--c3);color:var(--c);font-family:'Share Tech Mono';font-size:16px;padding:9px;outline:none;letter-spacing:.05em}
+  input:focus{border-color:var(--c)}
+  .row{display:flex;gap:8px}
+  .row>*{flex:1}
+  .icons{display:flex;gap:6px;flex-wrap:wrap}
+  .icons button{flex:1;min-width:52px;padding:8px 0;font-size:16px;font-family:'Share Tech Mono'}
+  .icons button.on{background:var(--c3);border-color:var(--c)}
+  .sheet .actions{display:flex;gap:8px;margin-top:16px}
+  .sheet .actions button{flex:1;padding:12px}
+
+  /* boot */
+  #boot{position:fixed;inset:0;background:var(--bg);z-index:60;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:30px;text-align:center}
+  #boot .h{font-size:30px;font-weight:900;letter-spacing:.25em;text-shadow:var(--glow)}
+  #boot .sub{font-family:'Orbitron';font-weight:600;font-size:11px;letter-spacing:.45em;color:var(--c2);margin-top:8px}
+  #boot pre{font-family:'Share Tech Mono';font-size:11px;color:var(--c2);text-align:left;margin:20px 0 14px;min-height:100px;white-space:pre-wrap;width:100%;max-width:300px}
+  #authPanel{width:100%;max-width:300px;display:flex;flex-direction:column;align-items:center}
+  .authmsg{font-size:11px;font-weight:600;letter-spacing:.22em;min-height:30px;line-height:1.4;text-shadow:var(--glow)}
+  .authmsg.bad{animation:blink .35s steps(2) 4}
+  #wave{width:100%;height:55px;margin:8px 0 4px;border-top:1px solid var(--c3);border-bottom:1px solid var(--c3)}
+  .heard{font-size:11px;color:var(--c2);min-height:16px;letter-spacing:.12em;margin-bottom:10px;text-transform:uppercase}
+  .authbtns{display:flex;flex-direction:column;gap:8px;width:100%}
+  .authbtns button{width:100%;padding:14px;font-size:12px}
+  .authbtns button.small{padding:8px;font-size:9px;border-color:var(--c3);color:var(--c2)}
+  .pinpad{width:100%;margin-bottom:10px}
+  .pindots{display:flex;justify-content:center;gap:12px;margin-bottom:12px;min-height:14px}
+  .pindots i{width:12px;height:12px;border:1px solid var(--c);transform:rotate(45deg)}
+  .pindots i.f{background:var(--c);box-shadow:var(--glow)}
+  .keys{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  .keys button{padding:14px 0;font-size:18px}
+  .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);border:1px solid var(--c);background:var(--bg);padding:8px 14px;font-size:11px;letter-spacing:.2em;z-index:70;display:none}
+</style>
+</head>
+<body data-theme="red">
+
+<div id="boot">
+  <div class="h">NAVCOM</div>
+  <div class="sub">NTS32-OPS // FIELD NAV</div>
+  <pre id="bootlog"></pre>
+  <div id="authPanel" style="visibility:hidden">
+    <div class="authmsg h" id="authMsg"></div>
+    <canvas id="wave" width="600" height="110"></canvas>
+    <div class="heard" id="heard">&nbsp;</div>
+    <div class="pinpad" id="pinPad" hidden>
+      <div class="pindots" id="pinDots"></div>
+      <div class="keys" id="keys"></div>
+    </div>
+    <div class="authbtns" id="authBtns"></div>
+  </div>
+</div>
+
+<div class="wrap">
+  <header>
+    <div class="brand h glow">NAVCOM<small>NTS32-OPS // FIELD NAV SYS</small></div>
+    <div class="clock"><b id="tLocal">--:--:--</b><br><span id="tZulu">--:--:--Z</span></div>
+  </header>
+
+  <div class="status">
+    <div class="pill" id="pGps"><span class="dot"></span>GPS</div>
+    <div class="pill" id="pMag"><span class="dot"></span>MAG</div>
+    <div class="pill" id="pLock"><span class="dot"></span>WAKE</div>
+    <div class="pill" id="pSync"><span class="dot"></span>SYNC</div>
+    <div class="pill" id="pFix" style="margin-left:auto">NO FIX</div>
+  </div>
+
+  <div class="frame">
+    <div class="tag">HEADING</div>
+    <div class="compass">
+      <svg viewBox="-160 -160 320 320" id="csvg">
+        <defs><filter id="g"><feGaussianBlur stdDeviation="1.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+        <circle r="150" fill="none" stroke="var(--c3)" stroke-width="1"/>
+        <circle r="104" fill="none" stroke="var(--c3)" stroke-width="1" stroke-dasharray="2 4"/>
+        <circle r="62" fill="none" stroke="var(--c4)" stroke-width="1"/>
+        <g id="sweep" opacity=".35"><path d="M0 0 L0 -104 A104 104 0 0 1 52 -90 Z" fill="var(--c3)"/></g>
+        <g id="ring"></g>
+        <!-- lubber line -->
+        <path d="M0 -158 L-7 -146 L7 -146 Z" fill="var(--c)" filter="url(#g)"/>
+        <line x1="0" y1="-104" x2="0" y2="-120" stroke="var(--c)" stroke-width="2"/>
+        <line x1="-150" y1="0" x2="-140" y2="0" stroke="var(--c2)"/><line x1="140" y1="0" x2="150" y2="0" stroke="var(--c2)"/>
+      </svg>
+      <div class="hdgbox">
+        <div class="l">HDG · <span id="hdgSrc">--</span></div>
+        <div class="v" id="hdg">---°</div>
+        <div class="card" id="hdgCard">--</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="frame target" id="targetBox">
+    <div class="tag">NAV TARGET</div>
+    <svg class="tarrow" id="tArrow" viewBox="-40 -40 80 80">
+      <circle r="36" fill="none" stroke="var(--c3)"/>
+      <path d="M0 -32 L14 14 L0 5 L-14 14 Z" fill="var(--c)" filter="url(#g)"/>
+    </svg>
+    <div style="flex:1;min-width:0">
+      <div class="name" id="tName">--</div>
+      <div class="dist" id="tDist">--</div>
+      <div class="meta" id="tMeta">BRG --- · ETA --</div>
+    </div>
+    <button id="tClear" style="padding:6px 8px">✕</button>
+  </div>
+
+  <div class="frame">
+    <div class="tag">POSITION</div>
+    <div class="grid">
+      <div class="cell coord" id="coordCell">
+        <div class="l" id="coordLbl">COORD · DD — TAP TO CYCLE</div>
+        <div class="v" id="coord">AWAITING FIX</div>
+      </div>
+      <div class="cell"><div class="l">ALT</div><div class="v" id="alt">---<small>M</small></div></div>
+      <div class="cell"><div class="l">SPD</div><div class="v" id="spd">---<small>KM/H</small></div></div>
+      <div class="cell"><div class="l">COG</div><div class="v" id="cog">---<small>°</small></div></div>
+      <div class="cell"><div class="l">ACC ±</div><div class="v" id="acc">---<small>M</small></div>
+        <div class="accbar"><i id="accBar" style="width:0"></i></div></div>
+    </div>
+  </div>
+
+  <div class="frame">
+    <div class="tag">SAFE HOUSES</div>
+    <div class="shhead">
+      <div class="h glow" id="shCount">00 SITES</div>
+      <button id="addBtn">+ Add</button>
+    </div>
+    <div id="shList"></div>
+  </div>
+
+  <div class="toolbar">
+    <button id="themeBtn">Mode: Red</button>
+    <button id="markBtn">Mark here</button>
+    <button id="exportBtn">Export</button>
+    <button id="importBtn">Import</button>
+    <button id="uplinkBtn">Uplink</button>
+    <button id="lockBtn">Lock</button>
+  </div>
+</div>
+
+<div class="modal" id="upModal">
+  <div class="sheet">
+    <div class="h glow">CLOUD UPLINK</div>
+    <div id="upOut">
+      <div style="font-size:11px;color:var(--c2);letter-spacing:.12em;line-height:1.5">SIGN IN TO SYNC SAFE HOUSES ACROSS ALL DEVICES.</div>
+      <label>OPERATOR EMAIL</label>
+      <input id="upEmail" type="email" autocomplete="username" autocapitalize="off" placeholder="operator@domain.com">
+      <label>ACCESS KEY</label>
+      <input id="upPass" type="password" autocomplete="current-password" placeholder="••••••••">
+      <div class="actions">
+        <button id="upSignup">Create account</button>
+        <button class="solid" id="upSignin">Sign in</button>
+      </div>
+    </div>
+    <div id="upIn" hidden>
+      <div class="grid" style="margin-top:0">
+        <div class="cell" style="grid-column:1/-1"><div class="l">LINKED OPERATOR</div><div class="v" id="upUser" style="font-size:14px;white-space:normal;word-break:break-all">--</div></div>
+        <div class="cell"><div class="l">LAST SYNC</div><div class="v" id="upLast" style="font-size:14px">--</div></div>
+        <div class="cell"><div class="l">CLOUD SITES</div><div class="v" id="upCount" style="font-size:14px">--</div></div>
+      </div>
+      <div class="actions">
+        <button id="upOutBtn">Sign out</button>
+        <button class="solid" id="upSyncBtn">Sync now</button>
+      </div>
+    </div>
+    <div id="upMsg" style="font-size:11px;letter-spacing:.15em;margin-top:12px;min-height:14px;color:var(--c2)"></div>
+    <div class="actions" style="margin-top:8px"><button id="upClose">Close</button></div>
+  </div>
+</div>
+
+<div class="modal" id="modal">
+  <div class="sheet">
+    <div class="h glow" id="mTitle">NEW SAFE HOUSE</div>
+    <label>DESIGNATION</label>
+    <input id="fName" maxlength="24" placeholder="HOME BASE" autocomplete="off">
+    <label>ICON</label>
+    <div class="icons" id="fIcons"></div>
+    <label>COORDINATES (LAT, LON)</label>
+    <div class="row">
+      <input id="fLat" inputmode="decimal" placeholder="49.8951">
+      <input id="fLon" inputmode="decimal" placeholder="-97.1384">
+    </div>
+    <div style="margin-top:8px"><button id="useHere" style="width:100%">⌖ Use current position</button></div>
+    <div class="actions">
+      <button id="mCancel">Abort</button>
+      <button class="solid" id="mSave">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ======== CLOUD UPLINK CONFIG — paste from Supabase → Project Settings → API ======== */
+const SUPABASE_URL      = 'https://sfiebsfnhchgvheijrrn.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmaWVic2ZuaGNoZ3ZoZWlqcnJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIzMzU0MzMsImV4cCI6MjEwNzkxMTQzM30.Igt9hetGj_L9f1ePXeR0rqW9mNI9k8NT44e5-3-UGM8';
+/* ==================================================================================== */
+(() => {
+  const $ = id => document.getElementById(id);
+  const R2D = 180/Math.PI, D2R = Math.PI/180;
+  const ICONS = ['⌂','◆','✚','▲','★','⚑','◎','⛽'];
+  const THEMES = [['red','Red'],['dim','Dim'],['nvg','NVG'],['amber','Amber'],['day','Day']];
+  const COORD_MODES = ['DD','DMS','MGRS','UTM'];
+
+  const store = {
+    get(k,d){ try{ const v = localStorage.getItem('navcom.'+k); return v==null?d:JSON.parse(v);}catch(e){return d;} },
+    set(k,v){ try{ localStorage.setItem('navcom.'+k, JSON.stringify(v)); }catch(e){} if(k==='houses') idb.put(v); }
+  };
+  // second copy of safe houses in IndexedDB, restored if localStorage is ever wiped
+  const idb = {
+    open(){ return new Promise((res,rej)=>{ const r=indexedDB.open('navcom',1);
+      r.onupgradeneeded=()=>r.result.createObjectStore('kv'); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); },
+    async put(v){ try{ const db=await this.open(); db.transaction('kv','readwrite').objectStore('kv').put(v,'houses'); }catch(e){} },
+    async get(){ try{ const db=await this.open(); return await new Promise(res=>{ const q=db.transaction('kv').objectStore('kv').get('houses'); q.onsuccess=()=>res(q.result); q.onerror=()=>res(null); }); }catch(e){ return null; } }
+  };
+  try{ navigator.storage && navigator.storage.persist && navigator.storage.persist(); }catch(e){}
+
+  let pos = null, heading = null, headingSrc = '--', smoothHdg = null;
+  let houses = store.get('houses', []);
+  houses.forEach(h=>{ if(!h.upd) h.upd=h.created||1; });
+  let tombs = store.get('tombs', {});   // deleted ids -> time, so deletes sync too
+  let targetId = store.get('target', null);
+  let coordMode = store.get('coordMode', 0);
+  let themeIdx = store.get('theme', 0);
+  let editIcon = ICONS[0];
+  let wakeLock = null;
+
+  /* ---------- geo math ---------- */
+  function haversine(a,b){
+    const R=6371008.8, dLat=(b.lat-a.lat)*D2R, dLon=(b.lon-a.lon)*D2R;
+    const s=Math.sin(dLat/2)**2+Math.cos(a.lat*D2R)*Math.cos(b.lat*D2R)*Math.sin(dLon/2)**2;
+    return 2*R*Math.asin(Math.sqrt(s));
+  }
+  function bearing(a,b){
+    const y=Math.sin((b.lon-a.lon)*D2R)*Math.cos(b.lat*D2R);
+    const x=Math.cos(a.lat*D2R)*Math.sin(b.lat*D2R)-Math.sin(a.lat*D2R)*Math.cos(b.lat*D2R)*Math.cos((b.lon-a.lon)*D2R);
+    return (Math.atan2(y,x)*R2D+360)%360;
+  }
+  function toUTM(lat,lon){
+    const a=6378137, f=1/298.257223563, e2=f*(2-f), ep2=e2/(1-e2), k0=0.9996;
+    let zone=Math.floor((lon+180)/6)+1;
+    if(lat>=56&&lat<64&&lon>=3&&lon<12) zone=32;
+    if(lat>=72&&lat<84){ if(lon>=0&&lon<9)zone=31; else if(lon<21)zone=33; else if(lon<33)zone=35; else if(lon<42)zone=37; }
+    const lon0=((zone-1)*6-180+3)*D2R, p=lat*D2R;
+    const N=a/Math.sqrt(1-e2*Math.sin(p)**2), T=Math.tan(p)**2, C=ep2*Math.cos(p)**2, A=Math.cos(p)*(lon*D2R-lon0);
+    const e4=e2*e2, e6=e4*e2;
+    const M=a*((1-e2/4-3*e4/64-5*e6/256)*p-(3*e2/8+3*e4/32+45*e6/1024)*Math.sin(2*p)+(15*e4/256+45*e6/1024)*Math.sin(4*p)-(35*e6/3072)*Math.sin(6*p));
+    const E=k0*N*(A+(1-T+C)*A**3/6+(5-18*T+T*T+72*C-58*ep2)*A**5/120)+500000;
+    let Nn=k0*(M+N*Math.tan(p)*(A*A/2+(5-T+9*C+4*C*C)*A**4/24+(61-58*T+T*T+600*C-330*ep2)*A**6/720));
+    if(lat<0) Nn+=10000000;
+    const band='CDEFGHJKLMNPQRSTUVWXX'[Math.max(0,Math.min(20,Math.floor((lat+80)/8)))];
+    return {zone,band,E,N:Nn};
+  }
+  function toMGRS(lat,lon){
+    if(lat<-80||lat>84) return 'OUT OF GRID';
+    const u=toUTM(lat,lon);
+    const col=['ABCDEFGH','JKLMNPQR','STUVWXYZ'][(u.zone-1)%3][Math.floor(u.E/100000)-1];
+    const row='ABCDEFGHJKLMNPQRSTUV'[(Math.floor(u.N/100000)%20+(u.zone%2===0?5:0))%20];
+    const e=String(Math.floor(u.E%100000)).padStart(5,'0'), n=String(Math.floor(u.N%100000)).padStart(5,'0');
+    return `${u.zone}${u.band} ${col}${row} ${e} ${n}`;
+  }
+  function dms(v,pos,neg){
+    const h=v>=0?pos:neg; v=Math.abs(v);
+    const d=Math.floor(v), mf=(v-d)*60, m=Math.floor(mf), s=((mf-m)*60).toFixed(1);
+    return `${h} ${String(d).padStart(2,'0')}°${String(m).padStart(2,'0')}'${s.padStart(4,'0')}"`;
+  }
+  const CARD=['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+  const card = d => CARD[Math.round(d/22.5)%16];
+  const p3 = d => String(Math.round(d)%360).padStart(3,'0');
+  function fmtDist(m){
+    if(m<1000) return `${Math.round(m)}<small>M</small>`;
+    if(m<100000) return `${(m/1000).toFixed(m<10000?2:1)}<small>KM</small>`;
+    return `${Math.round(m/1000)}<small>KM</small>`;
+  }
+  const plainDist = m => m<1000?`${Math.round(m)} M`:`${(m/1000).toFixed(m<10000?2:1)} KM`;
+
+  /* ---------- compass ring ---------- */
+  function buildRing(){
+    const g=$('ring'); let s='';
+    for(let d=0; d<360; d+=5){
+      const major=d%30===0, r1=150, r2=major?136:(d%10===0?142:145);
+      const a=(d-90)*D2R;
+      s+=`<line x1="${(r1*Math.cos(a)).toFixed(1)}" y1="${(r1*Math.sin(a)).toFixed(1)}" x2="${(r2*Math.cos(a)).toFixed(1)}" y2="${(r2*Math.sin(a)).toFixed(1)}" stroke="var(${major?'--c':'--c2'})" stroke-width="${major?2:1}"/>`;
+      if(major){
+        const lbl={0:'N',90:'E',180:'S',270:'W'}[d] ?? String(d/10).padStart(2,'0');
+        const big=d%90===0, rt=big?122:124;
+        s+=`<text x="${(rt*Math.cos(a)).toFixed(1)}" y="${(rt*Math.sin(a)).toFixed(1)}" fill="var(${big?'--c':'--c2'})" font-family="Orbitron" font-weight="${big?800:400}" font-size="${big?15:10}" text-anchor="middle" dominant-baseline="central" transform="rotate(${d} ${(rt*Math.cos(a)).toFixed(1)} ${(rt*Math.sin(a)).toFixed(1)})">${lbl}</text>`;
+      }
+    }
+    s+='<g id="blips"></g>';
+    g.innerHTML=s;
+  }
+  function drawBlips(){
+    const g=$('blips'); if(!g) return;
+    if(!pos){ g.innerHTML=''; return; }
+    g.innerHTML=houses.map(h=>{
+      const b=bearing(pos,h), a=(b-90)*D2R, r=104, sel=h.id===targetId;
+      const x=(r*Math.cos(a)).toFixed(1), y=(r*Math.sin(a)).toFixed(1);
+      return `<g transform="translate(${x} ${y}) rotate(${b})">
+        <rect x="${sel?-6:-4}" y="${sel?-6:-4}" width="${sel?12:8}" height="${sel?12:8}" fill="${sel?'var(--c)':'none'}" stroke="var(--c)" stroke-width="1.5" transform="rotate(45)" filter="url(#g)"/>
+        <text y="-13" fill="var(--c)" font-family="Share Tech Mono" font-size="9" text-anchor="middle">${esc(h.name.slice(0,8))}</text></g>`;
+    }).join('');
+  }
+
+  /* ---------- rendering ---------- */
+  function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+  function renderPos(){
+    if(!pos) return;
+    const c=pos, mode=COORD_MODES[coordMode];
+    $('coordLbl').textContent=`COORD · ${mode} — TAP TO CYCLE`;
+    let t;
+    if(mode==='DD') t=`${c.lat>=0?'N':'S'} ${Math.abs(c.lat).toFixed(6)}°<br>${c.lon>=0?'E':'W'} ${Math.abs(c.lon).toFixed(6)}°`;
+    else if(mode==='DMS') t=`${dms(c.lat,'N','S')}<br>${dms(c.lon,'E','W')}`;
+    else if(mode==='MGRS') t=toMGRS(c.lat,c.lon);
+    else { const u=toUTM(c.lat,c.lon); t=`${u.zone}${u.band}<br>${Math.round(u.E)}E ${Math.round(u.N)}N`; }
+    $('coord').innerHTML=t;
+    $('alt').innerHTML=c.alt!=null?`${Math.round(c.alt)}<small>M</small>`:`---<small>M</small>`;
+    $('spd').innerHTML=c.spd!=null?`${(c.spd*3.6).toFixed(c.spd*3.6<10?1:0)}<small>KM/H</small>`:`---<small>KM/H</small>`;
+    $('cog').innerHTML=(c.cog!=null&&!isNaN(c.cog)&&c.spd>0.7)?`${p3(c.cog)}<small>°${card(c.cog)}</small>`:`---<small>°</small>`;
+    $('acc').innerHTML=`${Math.round(c.acc)}<small>M</small>`;
+    $('accBar').style.width=Math.max(4,Math.min(100,100-(c.acc-3)*1.6))+'%';
+    const fix=$('pFix');
+    fix.textContent=c.acc<=15?'3D LOCK':c.acc<=50?'2D FIX':'WEAK FIX';
+    fix.classList.toggle('on',c.acc<=50);
+  }
+
+  function renderHouses(){
+    $('shCount').textContent=String(houses.length).padStart(2,'0')+' SITES';
+    const list=$('shList');
+    if(!houses.length){ list.innerHTML='<div class="empty">NO SAFE HOUSES REGISTERED. TAP + ADD OR MARK HERE.</div>'; return; }
+    const rows=houses.map(h=>{
+      let d=null,b=null;
+      if(pos){ d=haversine(pos,h); b=bearing(pos,h); }
+      return {h,d,b};
+    });
+    if(pos) rows.sort((a,b)=>a.d-b.d);
+    list.innerHTML=rows.map(({h,d,b},i)=>`
+      <div class="sh ${h.id===targetId?'sel':''}" data-id="${h.id}">
+        <div class="idx">${String(i+1).padStart(2,'0')}</div>
+        <div style="font-size:18px;width:20px;text-align:center">${esc(h.icon||'◆')}</div>
+        <div class="nm"><b>${esc(h.name)}</b><span>${toMGRS(h.lat,h.lon)}</span></div>
+        <div class="d">${d!=null?plainDist(d):'--'}<span>${b!=null?p3(b)+'° '+card(b):'---'}</span></div>
+        <svg viewBox="-12 -12 24 24" data-brg="${b??''}"><path d="M0 -10 L6 7 L0 3 L-6 7 Z" fill="var(--c)"/></svg>
+        <div class="x" data-del="${h.id}">✕</div>
+      </div>`).join('');
+    rotateArrows();
+  }
+
+  function rotateArrows(){
+    const hd=smoothHdg??0;
+    document.querySelectorAll('#shList svg[data-brg]').forEach(s=>{
+      const b=parseFloat(s.dataset.brg); if(!isNaN(b)) s.style.transform=`rotate(${b-hd}deg)`;
+    });
+  }
+
+  function renderTarget(){
+    const box=$('targetBox'), h=houses.find(x=>x.id===targetId);
+    if(!h){ box.classList.remove('show'); return; }
+    box.classList.add('show');
+    $('tName').textContent=`${h.icon||''} ${h.name}`;
+    if(!pos){ $('tDist').innerHTML='--'; return; }
+    const d=haversine(pos,h), b=bearing(pos,h);
+    $('tDist').innerHTML=fmtDist(d);
+    let eta='--';
+    if(pos.spd&&pos.spd>1){ const s=d/pos.spd; eta=s<3600?`${Math.round(s/60)} MIN`:`${Math.floor(s/3600)}H ${Math.round((s%3600)/60)}M`; }
+    $('tMeta').textContent=`BRG ${p3(b)}° ${card(b)} · ETA ${eta}`;
+    $('tArrow').style.transform=`rotate(${b-(smoothHdg??0)}deg)`;
+  }
+
+  function renderHeading(){
+    if(smoothHdg==null) return;
+    $('hdg').textContent=p3(smoothHdg)+'°';
+    $('hdgCard').textContent=card(smoothHdg);
+    $('hdgSrc').textContent=headingSrc;
+    $('ring').setAttribute('transform',`rotate(${-smoothHdg})`);
+    rotateArrows();
+    renderTarget();
+  }
+
+  // smooth heading toward target, handling wrap-around
+  function tick(){
+    if(heading!=null){
+      if(smoothHdg==null) smoothHdg=heading;
+      let diff=((heading-smoothHdg+540)%360)-180;
+      if(Math.abs(diff)>0.2){ smoothHdg=(smoothHdg+diff*0.18+360)%360; renderHeading(); }
+    }
+    requestAnimationFrame(tick);
+  }
+
+  let sweepA=0;
+  function sweep(){ sweepA=(sweepA+1.2)%360; $('sweep').setAttribute('transform',`rotate(${sweepA})`); requestAnimationFrame(sweep); }
+
+  function clock(){
+    const n=new Date();
+    $('tLocal').textContent=n.toLocaleTimeString('en-GB',{hour12:false});
+    $('tZulu').textContent=n.toISOString().slice(11,19)+'Z · '+n.toISOString().slice(0,10);
+  }
+
+  /* ---------- sensors ---------- */
+  function startGPS(){
+    if(!('geolocation' in navigator)){ toast('GEOLOCATION UNAVAILABLE'); return; }
+    navigator.geolocation.watchPosition(p=>{
+      const c=p.coords;
+      pos={lat:c.latitude,lon:c.longitude,alt:c.altitude,acc:c.accuracy,spd:c.speed,cog:c.heading,t:p.timestamp};
+      $('pGps').classList.add('on');
+      // fall back to GPS course when no magnetometer
+      if(headingSrc!=='MAG' && c.heading!=null && !isNaN(c.heading) && c.speed>1){ heading=c.heading; headingSrc='GPS'; }
+      renderPos(); renderHouses(); renderTarget(); drawBlips();
+    },err=>{
+      $('pGps').classList.remove('on');
+      $('pFix').textContent=err.code===1?'DENIED':'NO FIX';
+      if(err.code===1) toast('LOCATION PERMISSION DENIED');
+    },{enableHighAccuracy:true,maximumAge:1000,timeout:20000});
+  }
+
+  async function startCompass(){
+    const handler=e=>{
+      let h=null;
+      if(e.webkitCompassHeading!=null) h=e.webkitCompassHeading;             // iOS: true-ish north
+      else if(e.absolute && e.alpha!=null) h=(360-e.alpha)%360;               // Android absolute
+      if(h==null) return;
+      const ang=(screen.orientation&&screen.orientation.angle)||window.orientation||0;
+      heading=(h+ang+360)%360; headingSrc='MAG';
+      $('pMag').classList.add('on');
+    };
+    try{
+      if(typeof DeviceOrientationEvent!=='undefined' && typeof DeviceOrientationEvent.requestPermission==='function'){
+        const r=await DeviceOrientationEvent.requestPermission();
+        if(r!=='granted'){ toast('COMPASS DENIED — USING GPS COURSE'); return; }
+      }
+      if('ondeviceorientationabsolute' in window) window.addEventListener('deviceorientationabsolute',handler,true);
+      else window.addEventListener('deviceorientation',handler,true);
+    }catch(e){ toast('COMPASS UNAVAILABLE'); }
+  }
+
+  async function startWake(){
+    try{
+      if('wakeLock' in navigator){
+        wakeLock=await navigator.wakeLock.request('screen');
+        $('pLock').classList.add('on');
+        wakeLock.addEventListener('release',()=>$('pLock').classList.remove('on'));
+      }
+    }catch(e){}
+  }
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible' && booted) startWake(); });
+
+  /* ---------- safe house CRUD ---------- */
+  let editingId=null;
+  function openModal(prefill){
+    editingId=prefill?.id||null;
+    $('mTitle').textContent=editingId?'EDIT SAFE HOUSE':'NEW SAFE HOUSE';
+    $('fName').value=prefill?.name||'';
+    $('fLat').value=prefill?.lat!=null?prefill.lat.toFixed(6):'';
+    $('fLon').value=prefill?.lon!=null?prefill.lon.toFixed(6):'';
+    editIcon=prefill?.icon||ICONS[0];
+    $('fIcons').innerHTML=ICONS.map(i=>`<button class="${i===editIcon?'on':''}" data-i="${i}">${i}</button>`).join('');
+    $('modal').classList.add('show');
+  }
+  const closeModal=()=>$('modal').classList.remove('show');
+  function save(){
+    const name=$('fName').value.trim().toUpperCase()||'SITE '+(houses.length+1);
+    // accept "lat, lon" pasted into the lat box
+    let latS=$('fLat').value, lonS=$('fLon').value;
+    if(latS.includes(',')&&!lonS){ [latS,lonS]=latS.split(','); }
+    const lat=parseFloat(latS), lon=parseFloat(lonS);
+    if(isNaN(lat)||isNaN(lon)||Math.abs(lat)>90||Math.abs(lon)>180){ toast('INVALID COORDINATES'); return; }
+    let h;
+    if(editingId){ h=houses.find(x=>x.id===editingId); Object.assign(h,{name,lat,lon,icon:editIcon,upd:Date.now()}); }
+    else { h={id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),name,lat,lon,icon:editIcon,created:Date.now(),upd:Date.now()}; houses.push(h); }
+    store.set('houses',houses); cloud.push(h); closeModal(); renderHouses(); drawBlips(); renderTarget();
+    toast(editingId?'SITE UPDATED':'SAFE HOUSE REGISTERED');
+  }
+  function del(id){
+    const h=houses.find(x=>x.id===id); if(!h) return;
+    if(!confirm(`Delete safe house "${h.name}"?`)) return;
+    houses=houses.filter(x=>x.id!==id);
+    tombs[id]=Date.now(); store.set('tombs',tombs); cloud.push({...h,upd:tombs[id]},true);
+    if(targetId===id){ targetId=null; store.set('target',null); }
+    store.set('houses',houses); renderHouses(); drawBlips(); renderTarget();
+  }
+
+  /* ---------- events ---------- */
+  $('addBtn').onclick=()=>openModal();
+  $('markBtn').onclick=()=>{ if(!pos){toast('NO FIX YET');return;} openModal({lat:pos.lat,lon:pos.lon}); };
+  $('useHere').onclick=()=>{ if(!pos){toast('NO FIX YET');return;} $('fLat').value=pos.lat.toFixed(6); $('fLon').value=pos.lon.toFixed(6); };
+  $('mCancel').onclick=closeModal;
+  $('mSave').onclick=save;
+  $('modal').onclick=e=>{ if(e.target.id==='modal') closeModal(); };
+  $('fIcons').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; editIcon=b.dataset.i;
+    [...$('fIcons').children].forEach(c=>c.classList.toggle('on',c===b)); };
+  $('coordCell').onclick=()=>{ coordMode=(coordMode+1)%COORD_MODES.length; store.set('coordMode',coordMode); renderPos(); };
+  $('tClear').onclick=()=>{ targetId=null; store.set('target',null); renderTarget(); renderHouses(); drawBlips(); };
+
+  let pressT=null;
+  $('shList').addEventListener('click',e=>{
+    const x=e.target.closest('[data-del]'); if(x){ e.stopPropagation(); del(x.dataset.del); return; }
+    const row=e.target.closest('.sh'); if(!row) return;
+    targetId=targetId===row.dataset.id?null:row.dataset.id; store.set('target',targetId);
+    renderHouses(); renderTarget(); drawBlips();
+  });
+  // long-press a row to edit
+  $('shList').addEventListener('touchstart',e=>{
+    const row=e.target.closest('.sh'); if(!row||e.target.closest('[data-del]')) return;
+    pressT=setTimeout(()=>{ pressT=null; openModal(houses.find(h=>h.id===row.dataset.id)); },600);
+  },{passive:true});
+  ['touchend','touchmove'].forEach(ev=>$('shList').addEventListener(ev,()=>{ if(pressT){clearTimeout(pressT);pressT=null;} },{passive:true}));
+  $('shList').addEventListener('contextmenu',e=>{ const row=e.target.closest('.sh'); if(row){ e.preventDefault(); openModal(houses.find(h=>h.id===row.dataset.id)); } });
+
+  function applyTheme(){ const [k,l]=THEMES[themeIdx]; document.body.dataset.theme=k; $('themeBtn').textContent='Mode: '+l; }
+  $('themeBtn').onclick=()=>{ themeIdx=(themeIdx+1)%THEMES.length; store.set('theme',themeIdx); applyTheme(); };
+
+  $('exportBtn').onclick=async()=>{
+    const txt=JSON.stringify(houses);
+    try{ if(navigator.share){ await navigator.share({title:'NAVCOM safe houses',text:txt}); return; } }catch(e){ return; }
+    try{ await navigator.clipboard.writeText(txt); toast('COPIED TO CLIPBOARD'); }catch(e){ prompt('Copy this:',txt); }
+  };
+  $('importBtn').onclick=()=>{
+    const t=prompt('Paste exported safe-house data:'); if(!t) return;
+    try{
+      const arr=JSON.parse(t); if(!Array.isArray(arr)) throw 0;
+      let n=0; arr.forEach(h=>{ if(typeof h.lat==='number'&&typeof h.lon==='number'&&!houses.some(x=>x.id===h.id)){ houses.push({id:h.id||Date.now().toString(36)+Math.random().toString(36).slice(2,6),name:String(h.name||'SITE').slice(0,24),lat:h.lat,lon:h.lon,icon:h.icon||'◆',created:Date.now(),upd:Date.now()}); n++; } });
+      store.set('houses',houses); cloud.sync(); renderHouses(); drawBlips(); toast(`${n} SITES IMPORTED`);
+    }catch(e){ toast('IMPORT FAILED'); }
+  };
+
+  let toastT;
+  function toast(m){ const t=$('toast'); t.textContent=m; t.style.display='block'; clearTimeout(toastT); toastT=setTimeout(()=>t.style.display='none',2200); }
+
+  /* ---------- cloud uplink (Supabase) ---------- */
+  const cloud = (() => {
+    const configured = window.supabase && !SUPABASE_URL.includes('YOUR-PROJECT') && !SUPABASE_ANON_KEY.includes('YOUR-');
+    const sb = configured ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {auth:{persistSession:true,autoRefreshToken:true}}) : null;
+    const T = 'navcom_houses';
+    let user = null, busy = false, lastSync = store.get('lastSync', 0), remoteCount = null;
+
+    const pill = (on, active) => { const p=$('pSync'); p.classList.toggle('on', !!on); p.style.opacity = active ? .55 : ''; };
+    const row = (h, deleted) => ({ id:h.id, user_id:user.id, name:h.name, lat:h.lat, lon:h.lon, icon:h.icon||'◆',
+      deleted:!!deleted, updated_at:new Date(h.upd||Date.now()).toISOString() });
+    const upMsg = t => $('upMsg').textContent = t || '';
+
+    async function push(h, deleted){
+      if(!sb || !user) return;
+      const { error } = await sb.from(T).upsert(row(h, deleted), { onConflict:'id' });
+      if(error){ pill(true,true); console.warn(error); } else { lastSync=Date.now(); store.set('lastSync',lastSync); }
+    }
+
+    async function sync(silent){
+      if(!sb || !user || busy) return;
+      busy = true; pill(true, true);
+      try{
+        const { data, error } = await sb.from(T).select('*');
+        if(error) throw error;
+        const remote = new Map(data.map(r => [r.id, r]));
+        const ups = [];
+        let changed = false;
+        for(const r of data){
+          const rTs = Date.parse(r.updated_at), i = houses.findIndex(h => h.id === r.id), loc = houses[i];
+          if(r.deleted){
+            if(loc && (loc.upd||0) <= rTs){ houses.splice(i,1); changed = true; if(targetId===r.id){ targetId=null; store.set('target',null); } }
+            continue;
+          }
+          if(tombs[r.id] && tombs[r.id] >= rTs){ ups.push({id:r.id,user_id:user.id,name:r.name,lat:r.lat,lon:r.lon,icon:r.icon,deleted:true,updated_at:new Date(tombs[r.id]).toISOString()}); continue; }
+          if(!loc){ houses.push({id:r.id,name:r.name,lat:r.lat,lon:r.lon,icon:r.icon,created:rTs,upd:rTs}); changed = true; }
+          else if(rTs > (loc.upd||0)){ Object.assign(loc,{name:r.name,lat:r.lat,lon:r.lon,icon:r.icon,upd:rTs}); changed = true; }
+          else if((loc.upd||0) > rTs){ ups.push(row(loc)); }
+        }
+        houses.forEach(h => { if(!remote.has(h.id)) ups.push(row(h)); });
+        for(const id in tombs){ if(!remote.has(id) || remote.get(id).deleted) delete tombs[id]; }
+        store.set('tombs', tombs);
+        if(ups.length){ const { error:e2 } = await sb.from(T).upsert(ups, { onConflict:'id' }); if(e2) throw e2; }
+        remoteCount = houses.length;
+        if(changed){ store.set('houses', houses); renderHouses(); drawBlips(); renderTarget(); }
+        lastSync = Date.now(); store.set('lastSync', lastSync);
+        pill(true, false);
+        if(!silent) toast('UPLINK SYNCED // '+houses.length+' SITES');
+      }catch(e){
+        console.warn(e); pill(false); if(!silent) toast('SYNC FAILED'); upMsg('SYNC ERROR: '+(e.message||e).toString().toUpperCase());
+      }finally{ busy = false; renderModal(); }
+    }
+
+    function renderModal(){
+      $('upOut').hidden = !!user; $('upIn').hidden = !user;
+      if(user){
+        $('upUser').textContent = user.email;
+        $('upLast').textContent = lastSync ? new Date(lastSync).toLocaleTimeString('en-GB',{hour12:false}) : '--';
+        $('upCount').textContent = remoteCount!=null ? String(remoteCount).padStart(2,'0') : '--';
+      }
+    }
+
+    async function signIn(){
+      const email=$('upEmail').value.trim(), password=$('upPass').value;
+      if(!email || !password){ upMsg('EMAIL AND ACCESS KEY REQUIRED'); return; }
+      upMsg('AUTHENTICATING…');
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if(error){ upMsg('DENIED: '+error.message.toUpperCase()); return; }
+      $('upPass').value=''; upMsg('UPLINK ESTABLISHED');
+    }
+    async function signUp(){
+      const email=$('upEmail').value.trim(), password=$('upPass').value;
+      if(!email || password.length<8){ upMsg('EMAIL + ACCESS KEY (8+ CHARS) REQUIRED'); return; }
+      upMsg('REGISTERING…');
+      const { data, error } = await sb.auth.signUp({ email, password });
+      if(error){ upMsg('FAILED: '+error.message.toUpperCase()); return; }
+      upMsg(data.session ? 'OPERATOR REGISTERED // UPLINK ESTABLISHED' : 'CHECK EMAIL TO CONFIRM, THEN SIGN IN');
+    }
+
+    function init(){
+      $('uplinkBtn').onclick = () => {
+        $('upModal').classList.add('show');
+        if(!sb){ $('upOut').hidden=true; $('upIn').hidden=true; upMsg('UPLINK NOT CONFIGURED — ADD SUPABASE URL + KEY IN index.html'); return; }
+        upMsg(''); renderModal();
+      };
+      $('upClose').onclick = () => $('upModal').classList.remove('show');
+      $('upModal').onclick = e => { if(e.target.id==='upModal') $('upModal').classList.remove('show'); };
+      if(!sb) return;
+      $('upSignin').onclick = signIn;
+      $('upSignup').onclick = signUp;
+      $('upSyncBtn').onclick = () => sync(false);
+      $('upOutBtn').onclick = async () => { await sb.auth.signOut(); upMsg('UPLINK SEVERED // LOCAL DATA KEPT'); };
+      sb.auth.onAuthStateChange((ev, session) => {
+        const was = user; user = session ? session.user : null;
+        pill(!!user); renderModal();
+        if(user && (!was || ev==='SIGNED_IN')) sync(ev!=='SIGNED_IN');
+      });
+      document.addEventListener('visibilitychange', () => { if(document.visibilityState==='visible') sync(true); });
+      setInterval(() => sync(true), 60000);
+    }
+    return { push, sync, init };
+  })();
+
+  /* ---------- boot + voice auth ---------- */
+  let booted=false;
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  let creds=store.get('auth',null);           // {phrase, pin}
+  let authState=null, fails=0, tmpPhrase='', tmpPin='', pinBuf='', listening=false, level=0;
+
+  const lines=['> NAVCOM v1.1 // NTS32-OPS','> LOADING GRID REF ..... WGS84','> MGRS MODULE .......... OK',
+    '> VOICE MODULE ......... '+(SR?'OK':'OFFLINE'),'> SAFE HOUSE DB ........ '+String(houses.length).padStart(2,'0')+' SITES',
+    creds?'> AWAITING OPERATOR AUTH_':'> NO OPERATOR ON FILE_'];
+  let li=0; (function type(){ if(li<lines.length){ $('bootlog').textContent+=lines[li++]+'\n'; setTimeout(type,170);} else { $('authPanel').style.visibility='visible'; setState(creds?'auth':(SR?'enroll1':'pinset')); } })();
+
+  const norm=s=>String(s).toLowerCase().replace(/[^a-z0-9]/g,'');
+  function sim(a,b){
+    a=norm(a); b=norm(b); if(!a||!b) return 0;
+    const m=a.length,n=b.length, d=Array.from({length:m+1},(_,i)=>[i]);
+    for(let j=1;j<=n;j++) d[0][j]=j;
+    for(let i=1;i<=m;i++) for(let j=1;j<=n;j++) d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
+    return 1-d[m][n]/Math.max(m,n);
+  }
+  async function hash(s){
+    try{ const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('nts32:'+s));
+      return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join(''); }
+    catch(e){ let h=5381; for(const c of 'nts32:'+s) h=((h<<5)+h+c.charCodeAt(0))|0; return 'x'+h; }
+  }
+
+  function listen(){
+    return new Promise(resolve=>{
+      const rec=new SR(); rec.lang='en-US'; rec.interimResults=true; rec.maxAlternatives=5; rec.continuous=false;
+      let out=[], done=false;
+      const finish=()=>{ if(done) return; done=true; listening=false; clearTimeout(to); resolve(out); };
+      const to=setTimeout(()=>{ try{rec.stop();}catch(e){} },9000);
+      rec.onresult=e=>{
+        const r=e.results[e.results.length-1];
+        $('heard').textContent='“'+r[0].transcript.trim()+'”';
+        level=1;
+        if(r.isFinal){ out=[...r].map(a=>a.transcript); }
+      };
+      rec.onerror=e=>{ if(e.error==='not-allowed'||e.error==='service-not-allowed') msg('MIC ACCESS DENIED',true); finish(); };
+      rec.onend=finish;
+      listening=true; $('heard').textContent='LISTENING…';
+      try{ rec.start(); }catch(e){ finish(); }
+    });
+  }
+
+  function msg(t,bad){ const m=$('authMsg'); m.textContent=t; m.classList.remove('bad'); if(bad){ void m.offsetWidth; m.classList.add('bad'); } }
+  function btns(list){
+    $('authBtns').innerHTML=''; list.forEach(([label,fn,cls])=>{ const b=document.createElement('button'); b.textContent=label; if(cls) b.className=cls; b.onclick=fn; $('authBtns').appendChild(b); });
+  }
+  function showPad(on){ $('pinPad').hidden=!on; pinBuf=''; drawDots(); }
+  function drawDots(){ $('pinDots').innerHTML=Array.from({length:6},(_,i)=>`<i class="${i<pinBuf.length?'f':''}"></i>`).join(''); }
+  $('keys').innerHTML=['1','2','3','4','5','6','7','8','9','CLR','0','OK'].map(k=>`<button data-k="${k}" ${k.length>1?'style="font-size:11px"':''}>${k}</button>`).join('');
+  $('keys').onclick=e=>{
+    const k=e.target.closest('button')?.dataset.k; if(!k) return;
+    if(k==='CLR') pinBuf=''; else if(k==='OK') { pinSubmit(); return; } else if(pinBuf.length<6) pinBuf+=k;
+    drawDots();
+  };
+
+  async function voiceStep(){
+    if(listening) return;
+    const alts=await listen();
+    if(!alts.length){ $('heard').innerHTML='&nbsp;'; msg('NO SIGNAL — TRY AGAIN',true); return; }
+    if(authState==='enroll1'){
+      if(norm(alts[0]).length<8){ msg('PASSPHRASE TOO SHORT — USE 3+ WORDS',true); return; }
+      tmpPhrase=alts[0].trim(); setState('enroll2');
+    } else if(authState==='enroll2'){
+      if(alts.some(a=>sim(a,tmpPhrase)>=0.8)) setState('pinset');
+      else { msg('MISMATCH — RESTART ENROLLMENT',true); setTimeout(()=>setState('enroll1'),1400); }
+    } else if(authState==='auth'){
+      const best=Math.max(...alts.map(a=>sim(a,creds.phrase)));
+      if(best>=0.8){ setState('granted'); }
+      else { fails++; msg(`VOICEPRINT REJECTED [${fails}/3]`,true); if(fails>=3) setTimeout(()=>setState('pin'),1200); }
+    }
+  }
+
+  async function pinSubmit(){
+    if(pinBuf.length<4){ msg('PIN MUST BE 4–6 DIGITS',true); return; }
+    if(authState==='pinset'){ tmpPin=pinBuf; setState('pinconfirm'); }
+    else if(authState==='pinconfirm'){
+      if(pinBuf!==tmpPin){ msg('PIN MISMATCH — RESTART',true); setTimeout(()=>setState('pinset'),1000); return; }
+      creds={phrase:tmpPhrase||(creds&&creds.phrase)||'', pin:await hash(pinBuf)};
+      store.set('auth',creds); tmpPhrase=''; tmpPin=''; setState('granted','OPERATOR ENROLLED');
+    } else if(authState==='pin'){
+      if(await hash(pinBuf)===creds.pin){ fails=0; setState('granted',null,true); }
+      else { msg('INVALID OVERRIDE CODE',true); pinBuf=''; drawDots(); }
+    }
+  }
+
+  function setState(s,note,viaPin){
+    authState=s; $('heard').innerHTML='&nbsp;'; showPad(['pinset','pinconfirm','pin'].includes(s));
+    const speak=['● Speak passphrase',voiceStep,'solid'];
+    switch(s){
+      case 'enroll1': msg('ENROLL OPERATOR // STATE A PASSPHRASE (3+ WORDS)'); btns([speak,['Skip — PIN only',()=>{ tmpPhrase=''; setState('pinset'); },'small']]); break;
+      case 'enroll2': msg('CONFIRM // REPEAT PASSPHRASE'); btns([speak,['Restart',()=>setState('enroll1'),'small']]); break;
+      case 'pinset': msg((SR?'':'VOICE MODULE OFFLINE // ')+'SET OVERRIDE PIN (4–6 DIGITS)'); btns([]); break;
+      case 'pinconfirm': msg('CONFIRM OVERRIDE PIN'); btns([]); break;
+      case 'auth': fails=0; msg('VOICE AUTHENTICATION REQUIRED');
+        btns(SR&&creds.phrase?[speak,['PIN override',()=>setState('pin'),'small']]:[['Enter PIN',()=>setState('pin'),'solid']]); break;
+      case 'pin': msg('ENTER OVERRIDE CODE'); btns(SR&&creds.phrase?[['Back to voice',()=>setState('auth'),'small']]:[]); break;
+      case 'granted':
+        msg((note?note+' // ':'')+'ACCESS GRANTED');
+        $('bootlog').textContent+='> OPERATOR VERIFIED // WELCOME_\n';
+        const list=[[booted?'Resume':'Initialize',enter,'solid']];
+        if(viaPin && SR) list.push(['Re-enroll voice passphrase',()=>{ tmpPhrase=''; setState('enroll1'); },'small']);
+        btns(list); break;
+    }
+  }
+
+  async function enter(){
+    if(!booted){
+      booted=true;
+      await startCompass();           // must run inside the tap for iOS permission
+      startGPS();
+    }
+    startWake();
+    $('boot').style.display='none';
+  }
+
+  function lock(){
+    if(!creds) return;
+    $('boot').style.display='flex'; $('authPanel').style.visibility='visible';
+    $('bootlog').textContent='> NAVCOM v1.1 // NTS32-OPS\n> SESSION LOCKED_\n';
+    setState('auth');
+  }
+  $('lockBtn').onclick=lock;
+  // auto-lock after 5 min in background
+  let hiddenAt=0;
+  document.addEventListener('visibilitychange',()=>{
+    if(document.visibilityState==='hidden') hiddenAt=Date.now();
+    else if(booted && hiddenAt && Date.now()-hiddenAt>5*60*1000) lock();
+  });
+
+  // waveform
+  const wc=$('wave'), wx=wc.getContext('2d'); let wt=0, amp=0;
+  (function wave(){
+    wt+=0.08; amp+=((listening?0.35+level*0.65:0.03)-amp)*0.08; level*=0.94;
+    const col=getComputedStyle(document.body).getPropertyValue('--c').trim()||'#ff2a1a';
+    wx.clearRect(0,0,600,110); wx.fillStyle=col; wx.shadowColor=col; wx.shadowBlur=8;
+    for(let i=0;i<60;i++){
+      const n=Math.abs(Math.sin(i*0.55+wt*2.1)*Math.cos(i*0.23-wt*1.3)+Math.sin(i*1.7+wt*3.3)*0.35);
+      const h=Math.max(2,n*amp*100*(listening?(0.6+Math.random()*0.4):1));
+      wx.fillRect(i*10+2,55-h/2,6,h);
+    }
+    requestAnimationFrame(wave);
+  })();
+
+  applyTheme(); buildRing(); renderHouses(); renderTarget(); clock(); cloud.init();
+  idb.get().then(saved=>{
+    if(Array.isArray(saved) && saved.length && !houses.length){ houses=saved; store.set('houses',houses); renderHouses(); drawBlips(); renderTarget(); toast(`${saved.length} SITES RESTORED`); }
+    else if(houses.length) idb.put(houses);
+  });
+  setInterval(clock,1000); tick(); sweep();
+})();
+</script>
+</body>
+</html>
