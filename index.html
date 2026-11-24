@@ -747,11 +747,16 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
   /* ---------- boot + voice auth ---------- */
   let booted=false;
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  // iOS Home Screen web apps expose SpeechRecognition but never deliver audio → use keyboard dictation there
+  const STANDALONE=navigator.standalone===true||matchMedia('(display-mode: standalone)').matches;
+  let forceDict=false;
+  const live=()=>!!SR && !STANDALONE && !forceDict;
+  let curRec=null;
   let creds=store.get('auth',null);           // {phrase, pin}
   let authState=null, fails=0, tmpPhrase='', tmpPin='', pinBuf='', listening=false, level=0;
 
   const lines=['> NAVCOM v1.1 // NTS32-OPS','> LOADING GRID REF ..... WGS84','> MGRS MODULE .......... OK',
-    '> VOICE MODULE ......... '+(SR?'OK':'DICTATION MODE'),'> SAFE HOUSE DB ........ '+String(houses.length).padStart(2,'0')+' SITES',
+    '> VOICE MODULE ......... '+(live()?'LIVE':'DICTATION MODE'),'> SAFE HOUSE DB ........ '+String(houses.length).padStart(2,'0')+' SITES',
     creds?'> AWAITING OPERATOR AUTH_':'> NO OPERATOR ON FILE_'];
   let li=0; (function type(){ if(li<lines.length){ $('bootlog').textContent+=lines[li++]+'\n'; setTimeout(type,170);} else { $('authPanel').style.visibility='visible'; setState(creds?'auth':'enroll1'); } })();
 
@@ -772,19 +777,22 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
   function listen(){
     return new Promise(resolve=>{
       const rec=new SR(); rec.lang='en-US'; rec.interimResults=true; rec.maxAlternatives=5; rec.continuous=false;
-      let out=[], done=false;
-      const finish=()=>{ if(done) return; done=true; listening=false; clearTimeout(to); resolve(out); };
+      let out=[], last=[], done=false, err=null;
+      const finish=()=>{ if(done) return; done=true; listening=false; curRec=null; clearTimeout(to); setState(authState,null,null,true);
+        resolve({alts:out.length?out:last, err}); };
       const to=setTimeout(()=>{ try{rec.stop();}catch(e){} },9000);
       rec.onresult=e=>{
         const r=e.results[e.results.length-1];
         $('heard').textContent='“'+r[0].transcript.trim()+'”';
         level=1;
-        if(r.isFinal){ out=[...r].map(a=>a.transcript); }
+        last=[...r].map(a=>a.transcript);
+        if(r.isFinal){ out=last; }
       };
-      rec.onerror=e=>{ if(e.error==='not-allowed'||e.error==='service-not-allowed') msg('MIC ACCESS DENIED',true); finish(); };
+      rec.onerror=e=>{ err=e.error; finish(); };
       rec.onend=finish;
-      listening=true; $('heard').textContent='LISTENING…';
-      try{ rec.start(); }catch(e){ finish(); }
+      listening=true; curRec=rec; $('heard').textContent='LISTENING… TAP DONE WHEN FINISHED';
+      btns([['■ Done',()=>{ try{rec.stop();}catch(e){} },'solid']]);
+      try{ rec.start(); }catch(e){ err='start-failed'; finish(); }
     });
   }
 
@@ -807,7 +815,14 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
   async function voiceStep(){
     if(listening) return;
     let alts;
-    if(SR) alts=await listen();
+    if(live()){
+      const r=await listen(); alts=r.alts;
+      if(!alts.length){
+        const why={'not-allowed':'MIC ACCESS DENIED','service-not-allowed':'SPEECH SERVICE BLOCKED','no-speech':'NO SPEECH DETECTED','audio-capture':'MIC UNAVAILABLE'}[r.err]||'NO SIGNAL';
+        msg(why+' — TRY AGAIN OR USE DICTATION',true);
+        return;
+      }
+    }
     else { const v=$('phraseIn').value.trim(); $('phraseIn').value=''; $('phraseIn').blur(); alts=v?[v]:[]; if(v) $('heard').textContent='“'+v+'”'; }
     if(!alts.length){ $('heard').innerHTML='&nbsp;'; msg('NO SIGNAL — TRY AGAIN',true); return; }
     if(authState==='enroll1'){
@@ -836,18 +851,22 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
     }
   }
 
-  function setState(s,note,viaPin){
+  function setState(s,note,viaPin,keepMsg){
+    if(keepMsg){ // redraw buttons only, after a listen ends
+      const t=$('authMsg').textContent, h=$('heard').textContent; setState(s,note,viaPin); $('authMsg').textContent=t; $('heard').textContent=h; return;
+    }
     authState=s; $('heard').innerHTML='&nbsp;'; showPad(['pinset','pinconfirm','pin'].includes(s));
-    const dict=!SR && ['enroll1','enroll2','auth'].includes(s) && !(s==='auth'&&!creds.phrase);
+    const dict=!live() && ['enroll1','enroll2','auth'].includes(s) && !(s==='auth'&&!creds.phrase);
     $('phraseIn').hidden=!dict; $('phraseIn').value='';
-    const speak=[SR?'● Speak passphrase':'▶ Submit passphrase',voiceStep,'solid'];
+    const speak=[live()?'● Speak passphrase':'▶ Submit passphrase',voiceStep,'solid'];
+    const toDict=['Use keyboard dictation instead',()=>{ forceDict=true; setState(s); },'small'];
     switch(s){
-      case 'enroll1': msg('ENROLL OPERATOR // STATE A PASSPHRASE (3+ WORDS)'); btns([speak,['Skip — PIN only',()=>{ tmpPhrase=''; setState('pinset'); },'small']]); break;
+      case 'enroll1': msg('ENROLL OPERATOR // STATE A PASSPHRASE (3+ WORDS)'); btns([speak,...(live()?[toDict]:[]),['Skip — PIN only',()=>{ tmpPhrase=''; setState('pinset'); },'small']]); break;
       case 'enroll2': msg('CONFIRM // REPEAT PASSPHRASE'); btns([speak,['Restart',()=>setState('enroll1'),'small']]); break;
       case 'pinset': msg('SET OVERRIDE PIN (4–6 DIGITS)'); btns([]); break;
       case 'pinconfirm': msg('CONFIRM OVERRIDE PIN'); btns([]); break;
       case 'auth': fails=0; msg('VOICE AUTHENTICATION REQUIRED');
-        btns(creds.phrase?[speak,['PIN override',()=>setState('pin'),'small']]:[['Enter PIN',()=>setState('pin'),'solid']]); break;
+        btns(creds.phrase?[speak,...(live()?[toDict]:[]),['PIN override',()=>setState('pin'),'small']]:[['Enter PIN',()=>setState('pin'),'solid']]); break;
       case 'pin': msg('ENTER OVERRIDE CODE'); btns(creds.phrase?[['Back to voice',()=>setState('auth'),'small']]:[]); break;
       case 'granted':
         msg((note?note+' // ':'')+'ACCESS GRANTED');
