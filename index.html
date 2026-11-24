@@ -9,15 +9,23 @@
 <meta name="theme-color" content="#000000">
 <title>NAVCOM // NTS32-OPS</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
   :root{
+    --sat:env(safe-area-inset-top,0px);
+    --mapf:grayscale(1) sepia(1) saturate(6) hue-rotate(-42deg) brightness(.95) contrast(1.15);
     --c:#ff2a1a; --c2:rgba(255,42,26,.55); --c3:rgba(255,42,26,.22); --c4:rgba(255,42,26,.08);
     --bg:#000; --glow:0 0 6px rgba(255,42,26,.65);
   }
   body[data-theme="nvg"]  { --c:#39ff6a; --c2:rgba(57,255,106,.55); --c3:rgba(57,255,106,.22); --c4:rgba(57,255,106,.08); --glow:0 0 6px rgba(57,255,106,.6); }
   body[data-theme="amber"]{ --c:#ffb000; --c2:rgba(255,176,0,.55); --c3:rgba(255,176,0,.22); --c4:rgba(255,176,0,.08); --glow:0 0 6px rgba(255,176,0,.6); }
   body[data-theme="day"]  { --c:#e8f1ff; --c2:rgba(232,241,255,.6); --c3:rgba(232,241,255,.22); --c4:rgba(232,241,255,.07); --glow:0 0 5px rgba(160,200,255,.5); }
+  body[data-theme="nvg"]  { --mapf:grayscale(1) sepia(1) saturate(5) hue-rotate(72deg) brightness(.95) contrast(1.1); }
+  body[data-theme="amber"]{ --mapf:grayscale(1) sepia(1) saturate(4) hue-rotate(-5deg) brightness(.95) contrast(1.1); }
+  body[data-theme="day"]  { --mapf:none; }
+  body[data-theme="dim"]  { --mapf:grayscale(1) sepia(1) saturate(6) hue-rotate(-42deg) brightness(.45) contrast(1.2); }
   body[data-theme="dim"]  { --c:#8a0c04; --c2:rgba(138,12,4,.7); --c3:rgba(138,12,4,.35); --c4:rgba(138,12,4,.12); --glow:none; }
 
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -26,7 +34,7 @@
   html,body{background:var(--bg);color:var(--c);height:100%}
   body{
     font-family:'Share Tech Mono',ui-monospace,monospace;font-size:13px;letter-spacing:.06em;
-    padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+    padding:0 0 env(safe-area-inset-bottom);
     overflow-x:hidden;user-select:none;-webkit-user-select:none;
   }
   /* CRT scanlines + vignette */
@@ -36,7 +44,7 @@
     background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.7) 100%);}
   .h{font-family:'Orbitron',sans-serif;text-transform:uppercase}
   .glow{text-shadow:var(--glow)}
-  .wrap{max-width:480px;margin:0 auto;padding:10px 12px 40px}
+  .wrap{max-width:480px;margin:0 auto;padding:calc(var(--sat) + 10px) 12px 40px}
 
   /* header */
   header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1px solid var(--c3);padding-bottom:8px}
@@ -127,7 +135,7 @@
   .sheet .actions button{flex:1;padding:12px}
 
   /* boot */
-  #boot{position:fixed;inset:0;background:var(--bg);z-index:60;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:30px;text-align:center}
+  #boot{position:fixed;inset:0;background:var(--bg);z-index:60;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:calc(var(--sat) + 20px) 30px 30px;text-align:center}
   #boot .h{font-size:30px;font-weight:900;letter-spacing:.25em;text-shadow:var(--glow)}
   #boot .sub{font-family:'Orbitron';font-weight:600;font-size:11px;letter-spacing:.45em;color:var(--c2);margin-top:8px}
   #boot pre{font-family:'Share Tech Mono';font-size:11px;color:var(--c2);text-align:left;margin:20px 0 14px;min-height:100px;white-space:pre-wrap;width:100%;max-width:300px}
@@ -145,6 +153,33 @@
   .pindots i.f{background:var(--c);box-shadow:var(--glow)}
   .keys{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
   .keys button{padding:14px 0;font-size:18px}
+  /* ---------- road nav ---------- */
+  #nav{position:fixed;inset:0;z-index:30;background:#000}
+  #nav[hidden]{display:none}
+  #mapWrap{position:absolute;inset:0;overflow:hidden}
+  #mapRot{position:absolute;left:50%;top:50%;width:160vmax;height:160vmax;margin:-80vmax 0 0 -80vmax;transition:transform .6s linear;will-change:transform}
+  #map{width:100%;height:100%;background:#000}
+  #nav .leaflet-container{background:#000}
+  #nav .leaflet-tile-pane{filter:var(--mapf)}
+  #me{position:absolute;left:50%;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;z-index:5;transition:transform .5s linear;filter:drop-shadow(0 0 6px var(--c))}
+  .nvTop{position:absolute;left:10px;right:10px;top:calc(var(--sat) + 8px);display:flex;gap:12px;align-items:center;background:rgba(0,0,0,.9);border:1px solid var(--c2);padding:12px;z-index:6}
+  .nvTop::before{content:"";position:absolute;top:-2px;left:-2px;width:12px;height:12px;border:2px solid var(--c);border-right:0;border-bottom:0}
+  #mvIcon{width:62px;height:62px;flex:none}
+  .mvDist{font-family:'Orbitron';font-weight:800;font-size:30px;text-shadow:var(--glow);line-height:1}
+  .mvDist small{font-size:13px;margin-left:3px;color:var(--c2)}
+  .mvInstr{font-family:'Orbitron';font-weight:600;font-size:13px;letter-spacing:.08em;margin-top:5px;line-height:1.3}
+  .nvThen{position:absolute;left:10px;top:calc(var(--sat) + 104px);background:rgba(0,0,0,.9);border:1px solid var(--c3);padding:5px 10px;font-size:11px;letter-spacing:.15em;z-index:6}
+  .nvThen:empty{display:none}
+  .nvSide{position:absolute;right:10px;top:calc(var(--sat) + 104px);display:flex;flex-direction:column;gap:6px;z-index:6}
+  .nvSide button{width:46px;height:46px;padding:0;background:rgba(0,0,0,.88);font-size:10px;letter-spacing:.05em}
+  .nvSide button.on{background:var(--c);color:#000}
+  .nvBot{position:absolute;left:10px;right:10px;bottom:calc(env(safe-area-inset-bottom) + 10px);background:rgba(0,0,0,.9);border:1px solid var(--c2);padding:10px;z-index:6}
+  .nvStats{display:grid;grid-template-columns:repeat(4,1fr);text-align:center;margin-bottom:10px}
+  .nvStats b{display:block;font-family:'Orbitron';font-weight:700;font-size:17px;text-shadow:var(--glow)}
+  .nvStats span{font-size:9px;letter-spacing:.25em;color:var(--c2)}
+  .nvBtns{display:flex;gap:6px}
+  .nvBtns button{flex:1;padding:11px 4px;font-size:10px}
+  .nvAttr{position:absolute;left:12px;bottom:calc(env(safe-area-inset-bottom) + 136px);font-size:8px;color:var(--c2);z-index:6;letter-spacing:.1em}
   .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);border:1px solid var(--c);background:var(--bg);padding:8px 14px;font-size:11px;letter-spacing:.2em;z-index:70;display:none}
 </style>
 </head>
@@ -215,7 +250,7 @@
       <div class="dist" id="tDist">--</div>
       <div class="meta" id="tMeta">BRG --- · ETA --</div>
     </div>
-    <button id="tClear" style="padding:6px 8px">✕</button>
+    <div style="display:flex;flex-direction:column;gap:6px"><button class="solid" id="tNav" style="padding:9px 10px">▶ Nav</button><button id="tClear" style="padding:6px 8px">✕</button></div>
   </div>
 
   <div class="frame">
@@ -249,6 +284,36 @@
     <button id="importBtn">Import</button>
     <button id="uplinkBtn">Uplink</button>
     <button id="lockBtn">Lock</button>
+  </div>
+</div>
+
+<div id="nav" hidden>
+  <div id="mapWrap"><div id="mapRot"><div id="map"></div></div></div>
+  <svg id="me" viewBox="-24 -24 48 48"><path d="M0 -18 L13 15 L0 7 L-13 15 Z" fill="var(--c)" stroke="#000" stroke-width="2"/></svg>
+  <div class="nvTop">
+    <svg id="mvIcon" viewBox="-32 -32 64 64"></svg>
+    <div style="flex:1;min-width:0"><div class="mvDist" id="mvDist">--</div><div class="mvInstr" id="mvInstr">ACQUIRING ROUTE…</div></div>
+  </div>
+  <div class="nvThen" id="nvThen"></div>
+  <div class="nvSide">
+    <button id="nvCenter" title="Recenter">⌖</button>
+    <button id="nvHdg" title="Map orientation">HDG</button>
+    <button id="nvMute" title="Voice">VOX</button>
+    <button id="nvAll" title="Overview">ALL</button>
+  </div>
+  <div class="nvAttr">© OPENSTREETMAP © CARTO · ROUTING FOSSGIS/OSRM</div>
+  <div class="nvBot">
+    <div class="nvStats">
+      <div><b id="nvEta">--:--</b><span>ARRIVE</span></div>
+      <div><b id="nvRem">--</b><span>DIST</span></div>
+      <div><b id="nvTime">--</b><span>TIME</span></div>
+      <div><b id="nvSpd">--</b><span>KM/H</span></div>
+    </div>
+    <div class="nvBtns">
+      <button id="nvMode">Drive</button>
+      <button id="nvApple">Apple Maps</button>
+      <button class="solid" id="nvEnd">End</button>
+    </div>
   </div>
 </div>
 
@@ -491,6 +556,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
     $('ring').setAttribute('transform',`rotate(${-smoothHdg})`);
     rotateArrows();
     renderTarget();
+    nav.orient();
   }
 
   // smooth heading toward target, handling wrap-around
@@ -521,7 +587,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       $('pGps').classList.add('on');
       // fall back to GPS course when no magnetometer
       if(headingSrc!=='MAG' && c.heading!=null && !isNaN(c.heading) && c.speed>1){ heading=c.heading; headingSrc='GPS'; }
-      renderPos(); renderHouses(); renderTarget(); drawBlips();
+      renderPos(); renderHouses(); renderTarget(); drawBlips(); nav.update();
     },err=>{
       $('pGps').classList.remove('on');
       $('pFix').textContent=err.code===1?'DENIED':'NO FIX';
@@ -605,6 +671,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
   $('fIcons').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; editIcon=b.dataset.i;
     [...$('fIcons').children].forEach(c=>c.classList.toggle('on',c===b)); };
   $('coordCell').onclick=()=>{ coordMode=(coordMode+1)%COORD_MODES.length; store.set('coordMode',coordMode); renderPos(); };
+  $('tNav').onclick=()=>{ const h=houses.find(x=>x.id===targetId); if(h) nav.start(h); };
   $('tClear').onclick=()=>{ targetId=null; store.set('target',null); renderTarget(); renderHouses(); drawBlips(); };
 
   let pressT=null;
@@ -641,6 +708,212 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
   let toastT;
   function toast(m){ const t=$('toast'); t.textContent=m; t.style.display='block'; clearTimeout(toastT); toastT=setTimeout(()=>t.style.display='none',2200); }
+
+  /* ---------- safe area (Dynamic Island) ---------- */
+  function fixSafeArea(){
+    const p=document.createElement('div');
+    p.style.cssText='position:fixed;top:0;left:0;height:0;visibility:hidden;padding-top:env(safe-area-inset-top)';
+    document.body.appendChild(p);
+    const v=parseFloat(getComputedStyle(p).paddingTop)||0; p.remove();
+    const standalone=navigator.standalone===true||matchMedia('(display-mode: standalone)').matches;
+    // iOS sometimes reports 0 on first launch from the Home Screen — fall back to Dynamic Island height
+    const sat=(standalone && /iPhone/.test(navigator.userAgent) && v<20) ? 59 : v;
+    document.documentElement.style.setProperty('--sat', sat+'px');
+  }
+  fixSafeArea(); addEventListener('resize',()=>setTimeout(fixSafeArea,300)); addEventListener('orientationchange',()=>setTimeout(fixSafeArea,500));
+
+  /* ---------- road navigation ---------- */
+  const nav = (() => {
+    const ROUTERS={ drive:'https://routing.openstreetmap.de/routed-car/route/v1/driving/', walk:'https://routing.openstreetmap.de/routed-foot/route/v1/foot/' };
+    const VOX={ drive:[1000,300,60], walk:[150,30] };
+    let map=null, layers=[], active=false, dest=null, route=null, routing=false;
+    let mode=store.get('navMode','drive'), hdgUp=store.get('navHdgUp',true), muted=store.get('navMuted',false);
+    let follow=true, offCount=0, lastRoute=0, said={}, arrived=false, rot=0, voice=null;
+
+    const col=()=>getComputedStyle(document.body).getPropertyValue('--c').trim()||'#ff2a1a';
+    const fmt=m=>m<1000?`${Math.max(10,Math.round(m/10)*10)}<small>M</small>`:`${(m/1000).toFixed(m<10000?1:0)}<small>KM</small>`;
+    const spokenDist=m=>m<1000?`${Math.max(50,Math.round(m/50)*50)} metres`:`${(m/1000).toFixed(1).replace(/\.0$/,'')} kilometres`;
+
+    function speak(t){
+      if(muted||!('speechSynthesis' in window)) return;
+      try{
+        if(!voice){ const vs=speechSynthesis.getVoices(); voice=vs.find(v=>/en[-_](CA|US|GB)/i.test(v.lang)&&/enhanced|premium|siri/i.test(v.name))||vs.find(v=>/^en/i.test(v.lang))||null; }
+        const u=new SpeechSynthesisUtterance(t); if(voice) u.voice=voice; u.rate=1.02; u.pitch=.95;
+        speechSynthesis.cancel(); speechSynthesis.speak(u);
+      }catch(e){}
+    }
+
+    function ensureMap(){
+      if(map) return;
+      map=L.map('map',{zoomControl:false,attributionControl:false,zoomSnap:.25,inertia:false});
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:20}).addTo(map);
+      map.on('dragstart zoomstart',e=>{ if(e.originalEvent||e.type==='dragstart'){ follow=false; $('nvCenter').classList.remove('on'); } });
+    }
+
+    /* geometry */
+    function proj(p,o){ return { x:(p.lon-o.lon)*Math.cos(o.lat*D2R)*111320, y:(p.lat-o.lat)*110540 }; }
+    function closest(p){
+      const pts=route.pts; let best={d:Infinity,along:0,seg:0};
+      for(let i=0;i<pts.length-1;i++){
+        const a=proj(pts[i],p), b=proj(pts[i+1],p), dx=b.x-a.x, dy=b.y-a.y, L2=dx*dx+dy*dy;
+        let t=L2?-(a.x*dx+a.y*dy)/L2:0; t=Math.max(0,Math.min(1,t));
+        const x=a.x+t*dx, y=a.y+t*dy, d=Math.hypot(x,y);
+        if(d<best.d) best={d,seg:i,along:route.cum[i]+t*(route.cum[i+1]-route.cum[i])};
+      }
+      return best;
+    }
+
+    /* maneuvers */
+    function instr(s){
+      const m=s.maneuver, mod=(m.modifier||'').toUpperCase(), name=(s.name||s.ref||'').toUpperCase(), onto=name?` ONTO ${name}`:'';
+      switch(m.type){
+        case 'depart': return `HEAD ${card(m.bearing_after||0)}${name?' ON '+name:''}`;
+        case 'arrive': return `ARRIVE AT ${dest.name}`;
+        case 'roundabout': case 'rotary': return `ROUNDABOUT — TAKE EXIT ${m.exit||1}${onto}`;
+        case 'exit roundabout': case 'exit rotary': return `EXIT ROUNDABOUT${onto}`;
+        case 'merge': return `MERGE ${mod}${onto}`;
+        case 'on ramp': return `TAKE RAMP ${mod}${onto}`.replace('  ',' ');
+        case 'off ramp': return `TAKE EXIT ${mod}${onto}`.replace('  ',' ');
+        case 'fork': return `KEEP ${mod}${onto}`;
+        case 'continue': case 'new name': return (!mod||mod==='STRAIGHT')?`CONTINUE${onto}`:`KEEP ${mod}${onto}`;
+        default:
+          if(mod==='UTURN') return `MAKE A U-TURN${onto}`;
+          if(mod==='STRAIGHT') return `CONTINUE STRAIGHT${onto}`;
+          return `TURN ${mod}${onto}`;
+      }
+    }
+    const spoken=t=>t.toLowerCase().replace(/\bave\b/g,'avenue').replace(/\bst\b/g,'street').replace(/\brd\b/g,'road').replace(/\bblvd\b/g,'boulevard').replace(/\bhwy\b/g,'highway').replace(/\bdr\b/g,'drive').replace(/\bn\b/g,'north').replace(/\bs\b/g,'south').replace(/\be\b/g,'east').replace(/\bw\b/g,'west').replace(/—/g,',');
+    function icon(s){
+      const m=s.maneuver, c=col();
+      if(m.type==='arrive') return `<circle r="20" fill="none" stroke="${c}" stroke-width="4"/><circle r="9" fill="${c}"/><path d="M0 -30V-22M0 22V30M-30 0H-22M22 0H30" stroke="${c}" stroke-width="4"/>`;
+      if(/roundabout|rotary/.test(m.type)&&!/exit/.test(m.type)) return `<circle r="11" fill="none" stroke="${c}" stroke-width="5"/><path d="M0 28V11" stroke="${c}" stroke-width="6"/><path d="M8 -8L22 -22" stroke="${c}" stroke-width="6"/><path d="M26 -26L12 -24L24 -12Z" fill="${c}"/><text y="5" text-anchor="middle" font-family="Orbitron" font-weight="800" font-size="11" fill="${c}">${m.exit||''}</text>`;
+      const A={'straight':0,'slight right':40,'right':90,'sharp right':135,'slight left':-40,'left':-90,'sharp left':-135}[m.modifier||'straight'];
+      if(m.modifier==='uturn') return `<path d="M8 28V-4A10 10 0 0 0 -12 -4V10" fill="none" stroke="${c}" stroke-width="6"/><path d="M-24 6L-12 22L0 6Z" fill="${c}"/>`;
+      const a=(A??0)*D2R, bx=0, by=2, L=19, tx=bx+L*Math.sin(a), ty=by-L*Math.cos(a), h=11;
+      const ax=tx+h*Math.sin(a), ay=ty-h*Math.cos(a), lx=tx+h*.8*Math.cos(a), ly=ty+h*.8*Math.sin(a), rx=tx-h*.8*Math.cos(a), ry=ty-h*.8*Math.sin(a);
+      return `<path d="M0 30V${by}L${tx.toFixed(1)} ${ty.toFixed(1)}" fill="none" stroke="${c}" stroke-width="6" stroke-linejoin="round"/><path d="M${ax.toFixed(1)} ${ay.toFixed(1)}L${lx.toFixed(1)} ${ly.toFixed(1)}L${rx.toFixed(1)} ${ry.toFixed(1)}Z" fill="${c}"/>`;
+    }
+
+    function clearLayers(){ layers.forEach(l=>map.removeLayer(l)); layers=[]; }
+    function build(rt){
+      const pts=rt.geometry.coordinates.map(([lon,lat])=>({lat,lon}));
+      const cum=[0]; for(let i=1;i<pts.length;i++) cum.push(cum[i-1]+haversine(pts[i-1],pts[i]));
+      const total=cum[cum.length-1]||1;
+      let at=0; const steps=rt.legs[0].steps.map(s=>{ const o={...s,at}; at+=s.distance; return o; });
+      route={pts,cum,total,dist:rt.distance,dur:rt.duration,k:total/(rt.distance||total),steps};
+      clearLayers();
+      const ll=pts.map(p=>[p.lat,p.lon]), c=col();
+      layers.push(L.polyline(ll,{color:c,weight:16,opacity:.22,lineCap:'round'}).addTo(map));
+      layers.push(L.polyline(ll,{color:c,weight:6,opacity:.95,lineCap:'round',lineJoin:'round'}).addTo(map));
+      layers.push(L.circleMarker([dest.lat,dest.lon],{radius:10,color:c,weight:3,fillColor:c,fillOpacity:.35}).addTo(map));
+      said={}; offCount=0;
+    }
+
+    async function fetchRoute(isReroute){
+      if(!active) return;
+      if(!pos){ $('mvInstr').textContent='AWAITING GPS FIX…'; setTimeout(()=>fetchRoute(isReroute),2000); return; }
+      if(routing) return;
+      routing=true; lastRoute=Date.now();
+      $('mvInstr').textContent=isReroute?'RECALCULATING…':'ACQUIRING ROUTE…';
+      if(isReroute) speak('Recalculating');
+      try{
+        const url=`${ROUTERS[mode]}${pos.lon.toFixed(6)},${pos.lat.toFixed(6)};${dest.lon.toFixed(6)},${dest.lat.toFixed(6)}?overview=full&geometries=geojson&steps=true`;
+        const r=await fetch(url); const j=await r.json();
+        if(j.code!=='Ok'||!j.routes||!j.routes.length) throw new Error(j.message||j.code||'NO ROUTE');
+        if(!active) return;
+        build(j.routes[0]);
+        if(!isReroute){
+          speak(`Route to ${dest.name.toLowerCase()} acquired. ${spokenDist(route.dist)}, about ${Math.max(1,Math.round(route.dur/60))} minutes.`);
+          map.fitBounds(layers[1].getBounds(),{padding:[40,40]}); follow=false;
+          setTimeout(()=>{ if(active){ follow=true; $('nvCenter').classList.add('on'); update(); } },2500);
+        }
+        update(true);
+      }catch(e){
+        $('mvInstr').textContent='ROUTE FAILED — '+String(e.message||e).toUpperCase().slice(0,40);
+        $('mvDist').innerHTML='ERR'; $('mvIcon').innerHTML='';
+      }finally{ routing=false; }
+    }
+
+    function heading(){ return (pos&&pos.spd>2.5&&pos.cog!=null&&!isNaN(pos.cog))?pos.cog:(smoothHdg??0); }
+    function orient(){
+      if(!active) return;
+      const h=heading(), diff=((-h-rot)%360+540)%360-180; rot+=diff;
+      $('mapRot').style.transform=hdgUp?`rotate(${rot}deg)`:'none';
+      $('me').style.transform=hdgUp?'none':`rotate(${h}deg)`;
+    }
+    function zoomFor(){ if(mode==='walk') return 18; const k=(pos&&pos.spd||0)*3.6; return k>90?15.25:k>55?16:k>25?16.75:17.25; }
+
+    function update(force){
+      if(!active||!pos) return;
+      $('nvSpd').textContent=pos.spd!=null?Math.round(pos.spd*3.6):'--';
+      orient();
+      if(follow) map.setView([pos.lat,pos.lon],zoomFor(),{animate:true,duration:.8});
+      if(!route||routing) return;
+      if(arrived) return;
+      const c=closest(pos);
+      const thr=Math.max(35,Math.min(pos.acc||0,60)+20);
+      if(c.d>thr){ if(++offCount>=3 && Date.now()-lastRoute>8000){ fetchRoute(true); return; } } else offCount=0;
+      const remain=Math.max(0,route.total-c.along), alongO=c.along/route.k;
+      if(haversine(pos,dest)<30||remain<20){
+        arrived=true; $('mvIcon').innerHTML=icon({maneuver:{type:'arrive'}});
+        $('mvDist').innerHTML='ARRIVED'; $('mvInstr').textContent=dest.name; $('nvThen').textContent='';
+        speak(`You have arrived at ${dest.name.toLowerCase()}.`); return;
+      }
+      let i=route.steps.findIndex((s,idx)=>idx>0&&s.at>alongO+3); if(i<0) i=route.steps.length-1;
+      const st=route.steps[i], dTo=Math.max(0,(st.at-alongO)*route.k), txt=instr(st);
+      $('mvIcon').innerHTML=icon(st); $('mvDist').innerHTML=fmt(dTo); $('mvInstr').textContent=txt;
+      const nx=route.steps[i+1];
+      $('nvThen').textContent=(nx&&st.distance<250&&st.maneuver.type!=='arrive')?'THEN · '+instr(nx):'';
+      // voice
+      const th=VOX[mode];
+      for(let t=0;t<th.length;t++){
+        if(dTo<=th[t] && !said[i+':'+t]){
+          for(let u=0;u<=t;u++) said[i+':'+u]=1;
+          const last=t===th.length-1;
+          speak(last?spoken(txt):`In ${spokenDist(dTo)}, ${spoken(txt)}`);
+          break;
+        }
+      }
+      const frac=remain/route.total, secs=route.dur*frac, eta=new Date(Date.now()+secs*1000);
+      $('nvEta').textContent=eta.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+      $('nvRem').innerHTML=fmt(remain).replace(/<small>/,'<small style="font-size:9px">');
+      $('nvTime').textContent=secs<3600?Math.max(1,Math.round(secs/60))+'M':`${Math.floor(secs/3600)}H${String(Math.round(secs%3600/60)).padStart(2,'0')}`;
+    }
+
+    function syncBtns(){
+      $('nvMode').textContent=mode==='drive'?'▣ Drive':'▣ Walk';
+      $('nvHdg').textContent=hdgUp?'HDG↑':'N↑'; $('nvHdg').classList.toggle('on',hdgUp);
+      $('nvMute').textContent=muted?'MUTE':'VOX'; $('nvMute').classList.toggle('on',!muted);
+      $('nvCenter').classList.toggle('on',follow);
+      if(map){ hdgUp?map.dragging.disable():map.dragging.enable(); }
+    }
+
+    function start(h){
+      dest=h; active=true; arrived=false; route=null; follow=true; rot=0;
+      $('nav').hidden=false; ensureMap(); setTimeout(()=>map.invalidateSize(),50);
+      if(pos) map.setView([pos.lat,pos.lon],16); else map.setView([h.lat,h.lon],14);
+      clearLayers(); $('mvIcon').innerHTML=''; $('mvDist').innerHTML='--'; $('nvThen').textContent='';
+      ['nvEta','nvRem','nvTime'].forEach(id=>$(id).textContent='--');
+      syncBtns();
+      speak('Calculating route');   // first utterance inside the tap unlocks iOS speech
+      fetchRoute(false);
+    }
+    function end(){
+      active=false; route=null; $('nav').hidden=true;
+      try{ speechSynthesis.cancel(); }catch(e){}
+      if(map) clearLayers();
+    }
+
+    $('nvEnd').onclick=end;
+    $('nvCenter').onclick=()=>{ follow=true; syncBtns(); update(); };
+    $('nvHdg').onclick=()=>{ hdgUp=!hdgUp; store.set('navHdgUp',hdgUp); if(hdgUp){follow=true;} syncBtns(); orient(); update(); };
+    $('nvMute').onclick=()=>{ muted=!muted; store.set('navMuted',muted); if(muted) try{speechSynthesis.cancel();}catch(e){} else speak('Voice guidance on'); syncBtns(); };
+    $('nvAll').onclick=()=>{ if(!route) return; follow=false; if(hdgUp){ hdgUp=false; orient(); } syncBtns(); map.fitBounds(layers[1].getBounds(),{padding:[60,60]}); };
+    $('nvMode').onclick=()=>{ mode=mode==='drive'?'walk':'drive'; store.set('navMode',mode); syncBtns(); route=null; fetchRoute(false); };
+    $('nvApple').onclick=()=>{ if(dest) location.href=`https://maps.apple.com/?daddr=${dest.lat},${dest.lon}&dirflg=${mode==='walk'?'w':'d'}`; };
+
+    return { start, end, update, orient };
+  })();
 
   /* ---------- cloud uplink (Supabase) ---------- */
   const cloud = (() => {
